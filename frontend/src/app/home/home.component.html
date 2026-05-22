@@ -1,0 +1,28 @@
+<div>
+  <button class="button" (click)="onUploadClicked()">Upload</button>
+  <table class="table" *ngIf="files.length">
+    <thead>
+      <tr>
+        <th>Org File Name</th>
+        <th>File Name</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let f of files">
+        <td>{{ f.orgFileName }}</td>
+        <td>{{ f.fileName }}</td>
+        <td>
+          <button class="button" (click)="deleteFile(f.id)">Delete</button>
+          <button class="button" (click)="openFile(f)">Open</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p *ngIf="!files.length">No files</p>
+
+  <app-upload-dialog
+    *ngIf="showUpload"
+    (close)="onUploadFinished($event)"
+  ></app-upload-dialog>
+</div>
