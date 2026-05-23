@@ -4,11 +4,10 @@ import { FileService } from "../../services/file.service";
 import { FileInfo } from "../../models/file-info.interface";
 
 @Component({
-  selector: "app-home",
-  templateUrl: "./home.component.html",
-  styleUrls: ["./home.component.css"],
-  standalone: true,
-  imports: [UploadDialogComponent],
+    selector: "app-home",
+    templateUrl: "./home.component.html",
+    styleUrls: ["./home.component.css"],
+    imports: [UploadDialogComponent]
 })
 export class HomeComponent implements OnInit {
   files: FileInfo[] = [];

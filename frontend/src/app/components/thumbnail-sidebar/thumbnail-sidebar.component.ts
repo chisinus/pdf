@@ -10,13 +10,12 @@ import {
 import { CdkVirtualScrollViewport } from "@angular/cdk/scrolling";
 
 @Component({
-  selector: "app-thumbnail-sidebar",
-  templateUrl: "./thumbnail-sidebar.component.html",
-  styleUrls: ["./thumbnail-sidebar.component.css"],
-  standalone: true,
-  imports: [
-    CdkVirtualScrollViewport
-  ],
+    selector: "app-thumbnail-sidebar",
+    templateUrl: "./thumbnail-sidebar.component.html",
+    styleUrls: ["./thumbnail-sidebar.component.css"],
+    imports: [
+        CdkVirtualScrollViewport
+    ]
 })
 export class ThumbnailSidebarComponent implements OnChanges {
   @Input() documentId!: string;
