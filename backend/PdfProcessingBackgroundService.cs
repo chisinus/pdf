@@ -128,7 +128,7 @@ public class PdfProcessingBackgroundService : BackgroundService
                 var settings = new MagickReadSettings
                 {
                     Density = new Density(72),
-                    FrameIndex = i,
+                    FrameIndex = (uint?)i,
                     FrameCount = 1
                 };
 
