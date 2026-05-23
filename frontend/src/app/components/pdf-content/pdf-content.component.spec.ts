@@ -8,7 +8,7 @@ describe('PdfContentComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [PdfContentComponent]
+      declarations: [PdfContentComponent],
     });
     fixture = TestBed.createComponent(PdfContentComponent);
     component = fixture.componentInstance;

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --open",
+    "start": "ng serve",
     "build": "ng build",
     "test": "ng test",
     "lint": "ng lint",
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@angular/animations": "^21.2.14",
+    "@angular/cdk": "^21.2.12",
     "@angular/common": "^21.2.14",
     "@angular/compiler": "^21.2.14",
     "@angular/core": "^21.2.14",
@@ -27,6 +28,9 @@
     "@angular-devkit/build-angular": "^21.2.12",
     "@angular/cli": "^21.2.12",
     "@angular/compiler-cli": "^21.2.14",
+    "@types/jest": "^30.0.0",
+    "jest": "^30.4.2",
+    "jest-preset-angular": "^16.1.5",
     "typescript": "~5.9.3"
   }
 }

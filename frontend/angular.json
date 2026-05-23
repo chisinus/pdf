@@ -1,11 +1,12 @@
 {
-  "$schema": "https://angular.io/cli/schema.json",
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
   "projects": {
     "angular-file-manager": {
       "projectType": "application",
       "root": "src",
       "sourceRoot": "src",
+      "prefix": "app",
       "architect": {
         "build": {
           "builder": "@angular-devkit/build-angular:browser",
@@ -13,21 +14,40 @@
             "outputPath": "dist/angular-file-manager",
             "index": "src/index.html",
             "main": "src/main.ts",
-            "polyfills": "src/polyfills.ts",
-            "tsConfig": "tsconfig.json",
-            "assets": ["src/assets"],
-            "styles": ["src/styles.css"]
+            "polyfills": [],
+            "tsConfig": "tsconfig.app.json",
+            "assets": ["src/favicon.ico", "src/assets"],
+            "styles": ["src/styles.scss"],
+            "scripts": []
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kb",
+                  "maximumError": "1mb"
+                }
+              ],
+              "outputHashing": "all"
+            }
           }
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "browserTarget": "angular-file-manager:build"
+            "buildTarget": "angular-file-manager:build"
+          },
+          "configurations": {
+            "production": {
+              "buildTarget": "angular-file-manager:build:production"
+            }
           }
         }
       }
     }
   },
+  "defaultProject": "angular-file-manager",
   "cli": {
     "analytics": false
   }
