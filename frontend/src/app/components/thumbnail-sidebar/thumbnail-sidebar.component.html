@@ -1,0 +1,19 @@
+<p>thumbnail-sidebar works!</p>
+<div class="sidebar-container">
+  <cdk-virtual-scroll-viewport itemSize="200" class="scroll-viewport">
+    <div
+      *cdkVirtualFor="let page of pages"
+      class="thumbnail-container"
+      [class.active]="page === activePage"
+      (click)="selectPage(page)"
+    >
+      <div class="page-label">Page {{ page }}</div>
+      <img
+        [src]="'/api/pdf/' + documentId + '/thumbnails/' + page"
+        alt="Page {{ page }}"
+        class="thumbnail-image"
+        (error)="handleImageError($event)"
+      />
+    </div>
+  </cdk-virtual-scroll-viewport>
+</div>

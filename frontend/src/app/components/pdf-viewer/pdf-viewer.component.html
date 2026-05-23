@@ -1,0 +1,20 @@
+<div class="viewer-layout">
+  <app-activity-bar></app-activity-bar>
+
+  <app-pdf-content
+    class="main-content"
+    [documentId]="documentId"
+    [pageCount]="pageCount"
+    [activePage]="currentVisiblePage"
+    (visiblePageChanged)="onVisiblePageChanged($event)"
+  >
+  </app-pdf-content>
+
+  <app-thumbnail-sidebar
+    [documentId]="documentId"
+    [pageCount]="pageCount"
+    [activePage]="currentVisiblePage"
+    (pageSelected)="onSidebarPageSelected($event)"
+  >
+  </app-thumbnail-sidebar>
+</div>

@@ -1,0 +1,11 @@
+.viewer-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: #f9fafb;
+}
+.main-content {
+  flex-grow: 1;
+  height: 100%;
+}

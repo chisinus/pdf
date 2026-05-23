@@ -1,0 +1,8 @@
+.activity-bar {
+  width: 60px;
+  height: 100vh;
+  background-color: #1f2937; /* Tailwind gray-800 */
+  color: white;
+  display: flex;
+  flex-direction: column;
+}
