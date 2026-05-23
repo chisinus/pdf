@@ -7,6 +7,7 @@ import { FileInfo } from '../../models/file-info.interface';
   selector: 'app-home',
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.css'],
+  standalone: true,
   imports: [UploadDialogComponent],
 })
 export class HomeComponent implements OnInit {

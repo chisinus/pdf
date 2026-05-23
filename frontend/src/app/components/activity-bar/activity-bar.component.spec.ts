@@ -8,7 +8,7 @@ describe('ActivityBarComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [ActivityBarComponent]
+      imports: [ActivityBarComponent],
     });
     fixture = TestBed.createComponent(ActivityBarComponent);
     component = fixture.componentInstance;

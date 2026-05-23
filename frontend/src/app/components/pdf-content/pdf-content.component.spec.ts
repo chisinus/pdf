@@ -7,8 +7,14 @@ describe('PdfContentComponent', () => {
   let fixture: ComponentFixture<PdfContentComponent>;
 
   beforeEach(() => {
+    (window as any).IntersectionObserver = jest.fn().mockImplementation(() => ({
+      observe: jest.fn(),
+      unobserve: jest.fn(),
+      disconnect: jest.fn(),
+    }));
+
     TestBed.configureTestingModule({
-      declarations: [PdfContentComponent],
+      imports: [PdfContentComponent],
     });
     fixture = TestBed.createComponent(PdfContentComponent);
     component = fixture.componentInstance;
