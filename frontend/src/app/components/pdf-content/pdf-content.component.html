@@ -1,21 +1,18 @@
 <div class="pdf-scroll-container">
   <!-- Outer container is always rendered to maintain correct scroll height -->
-  <div
-    *ngFor="let page of pages"
-    #pageContainer
-    [attr.data-page-number]="page"
-    class="pdf-page-placeholder"
-  >
-    <!-- Inner content is lazily loaded only when in the buffer zone -->
-    @if (isPageRendered(page)) {
-      <div class="page-content">
-        <h2>Page {{ page }}</h2>
-        <!-- PDF rendering canvas goes here -->
-      </div>
-    } @else {
-      <div class="placeholder-content">
-        <span>Loading Page {{ page }}...</span>
-      </div>
-    }
-  </div>
+  @for (page of pages; track page) {
+    <div #pageContainer [attr.data-page-number]="page" class="pdf-page-placeholder">
+      <!-- Inner content is lazily loaded only when in the buffer zone -->
+      @if (isPageRendered(page)) {
+        <div class="page-content">
+          <h2>Page {{ page }}</h2>
+          <!-- PDF rendering canvas goes here -->
+        </div>
+      } @else {
+        <div class="placeholder-content">
+          <span>Loading Page {{ page }}...</span>
+        </div>
+      }
+    </div>
+  }
 </div>
