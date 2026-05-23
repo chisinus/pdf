@@ -28,7 +28,6 @@
       }
     }
   },
-  "defaultProject": "angular-file-manager",
   "cli": {
     "analytics": false
   }
