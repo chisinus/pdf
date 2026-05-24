@@ -5,7 +5,8 @@ using FileInfo = PDFBackend.Models.FileInfo;
 namespace PDFBackend.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+//[Route("api/[controller]")]
+[Route("api")]
 public class PdfController : ControllerBase
 {
     private readonly string _uploadFolder;
@@ -23,6 +24,9 @@ public class PdfController : ControllerBase
     }
 
     [HttpPost]
+    [Route("upload")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Upload(IFormFile file)
     {
         if (file == null || file.Length == 0)
@@ -47,6 +51,8 @@ public class PdfController : ControllerBase
     }
 
     [HttpGet]
+    [Route("files")]
+    [ProducesResponseType(typeof(IEnumerable<FileInfo>), StatusCodes.Status200OK)]
     public IActionResult GetFiles()
     {
         var files = new List<FileInfo>();
@@ -69,7 +75,10 @@ public class PdfController : ControllerBase
         return Ok(files);
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete]
+    [Route("delete/{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult Delete(string id)
     {
         var folderPath = Path.Combine(_uploadFolder, id);
@@ -81,7 +90,10 @@ public class PdfController : ControllerBase
         return NotFound(new { Message = "File not found." });
     }
 
-    [HttpGet("{id}/download")]
+    [HttpGet("download/{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status206PartialContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult Download(string id)
     {
         var folderPath = Path.Combine(_uploadFolder, id);
@@ -94,7 +106,9 @@ public class PdfController : ControllerBase
         return PhysicalFile(pdfFile.FullName, "application/pdf", enableRangeProcessing: true);
     }
 
-    [HttpGet("{id}/metadata")]
+    [HttpGet("metadata/{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetMetadata(string id)
     {
         var metadataPath = Path.Combine(_uploadFolder, id, "pages-metadata.json");
@@ -104,7 +118,9 @@ public class PdfController : ControllerBase
         return Content(json, "application/json");
     }
 
-    [HttpGet("{id}/thumbnails/{page}")]
+    [HttpGet("/thumbnails/{page}/{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetThumbnail(string id, int page)
     {
         var thumbPath = Path.Combine(_uploadFolder, id, $"thumbnail.{page}.png");

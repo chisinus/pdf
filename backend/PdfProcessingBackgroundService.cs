@@ -80,9 +80,14 @@ public class PdfProcessingBackgroundService : BackgroundService
     private async Task LinearizePdfAsync(string filePath, CancellationToken stoppingToken)
     {
         var tempFilePath = filePath + ".tmp.pdf";
+
+        // Look for qpdf in a local 'qpdf' folder first, fallback to system PATH
+        var localQpdfPath = Path.Combine(AppContext.BaseDirectory, "qpdf", "qpdf.exe");
+        var executable = File.Exists(localQpdfPath) ? localQpdfPath : "qpdf";
+
         var startInfo = new ProcessStartInfo
         {
-            FileName = "qpdf",
+            FileName = executable,
             Arguments = $"--linearize \"{filePath}\" \"{tempFilePath}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -90,15 +95,30 @@ public class PdfProcessingBackgroundService : BackgroundService
             CreateNoWindow = true
         };
 
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Failed to start QPDF. Ensure qpdf is installed and added to your system's PATH.");
-
-        await process.WaitForExitAsync(stoppingToken);
-
-        if (process.ExitCode != 0)
+        Process? process;
+        try
         {
-            var error = await process.StandardError.ReadToEndAsync(stoppingToken);
-            throw new Exception($"QPDF failed with exit code {process.ExitCode}: {error}");
+            process = Process.Start(startInfo);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to start QPDF. Tried path: {executable}. Ensure qpdf is installed or placed in the qpdf folder.", ex);
+        }
+
+        if (process == null)
+        {
+            throw new InvalidOperationException("Failed to start QPDF process (returned null).");
+        }
+
+        using (process)
+        {
+            await process.WaitForExitAsync(stoppingToken);
+
+            if (process.ExitCode != 0)
+            {
+                var error = await process.StandardError.ReadToEndAsync(stoppingToken);
+                throw new Exception($"QPDF failed with exit code {process.ExitCode}: {error}");
+            }
         }
 
         // Replace the original file with the linearized version
@@ -111,6 +131,13 @@ public class PdfProcessingBackgroundService : BackgroundService
         // Offload CPU-heavy image processing to a background thread
         await Task.Run(() =>
         {
+            // If Ghostscript is bundled locally, tell Magick.NET where to find it.
+            var localGsPath = Path.Combine(AppContext.BaseDirectory, "ghostscript");
+            if (Directory.Exists(localGsPath))
+            {
+                MagickNET.SetGhostscriptDirectory(localGsPath);
+            }
+
             // Get page count using PdfSharpCore to avoid loading all images into RAM at once
             using var document = PdfReader.Open(filePath, PdfDocumentOpenMode.InformationOnly);
             int pageCount = document.PageCount;
