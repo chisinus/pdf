@@ -1,0 +1,15 @@
+.toolbar {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+}
+
+.pdf-container {
+  position: relative;
+  width: 100%;
+  height: auto;
+}
+
+.pdf-container canvas {
+  border: 1px solid #ccc;
+}

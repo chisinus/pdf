@@ -1,8 +1,12 @@
-<div class="viewer-layout">
-  <app-activity-bar></app-activity-bar>
+<div
+  class="viewer-layout"
+  style="display: flex; flex-direction: row; height: 100vh; width: 100%; overflow: hidden"
+>
+  <app-activity-bar style="flex-shrink: 0"></app-activity-bar>
 
   <app-pdf-content
     class="main-content"
+    style="flex: 1; height: 100%; overflow-y: auto"
     [documentId]="documentId"
     [pageCount]="pageCount"
     [activePage]="currentVisiblePage"
@@ -11,6 +15,7 @@
   </app-pdf-content>
 
   <app-thumbnail-sidebar
+    style="flex-shrink: 0; height: 100%"
     [documentId]="documentId"
     [pageCount]="pageCount"
     [activePage]="currentVisiblePage"

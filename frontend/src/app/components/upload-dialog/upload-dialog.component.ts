@@ -1,10 +1,10 @@
-import { Component, EventEmitter, Output } from "@angular/core";
-import { FileService } from "../../services/file.service";
+import { Component, EventEmitter, Output } from '@angular/core';
+import { FileService } from '../../services/file.service';
 
 @Component({
-  selector: "app-upload-dialog",
-  templateUrl: "./upload-dialog.component.html",
-  styleUrls: ["./upload-dialog.component.css"],
+  selector: 'app-upload-dialog',
+  templateUrl: './upload-dialog.component.html',
+  styleUrls: ['./upload-dialog.component.scss'],
   standalone: true,
 })
 export class UploadDialogComponent {
@@ -23,11 +23,7 @@ export class UploadDialogComponent {
   onDrop(ev: DragEvent) {
     ev.preventDefault();
     this.dragging = false;
-    if (
-      ev.dataTransfer &&
-      ev.dataTransfer.files &&
-      ev.dataTransfer.files.length
-    ) {
+    if (ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files.length) {
       this.file = ev.dataTransfer.files[0];
     }
   }
@@ -60,6 +56,6 @@ export class UploadDialogComponent {
   }
 
   get selectedFileName(): string {
-    return this.file ? this.file.name : "No file selected";
+    return this.file ? this.file.name : 'No file selected';
   }
 }

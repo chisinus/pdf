@@ -22,6 +22,7 @@
               <td>
                 <button class="button" (click)="deleteFile(f.uniqueName)">Delete</button>
                 <button class="button" (click)="openFile(f)">Open</button>
+                <button class="button" (click)="openWithPdfJs(f)">Open with PDFJs</button>
               </td>
             </tr>
           }
@@ -39,7 +40,15 @@
 } @else {
   <div>
     <button class="button" (click)="closeViewer()">Back to List</button>
-    <app-pdf-viewer [documentId]="selectedFile.uniqueName" [pageCount]="selectedFile.thumbnails">
-    </app-pdf-viewer>
+    @if (activeViewer === 'simple') {
+      <app-pdf-viewer [documentId]="selectedFile.uniqueName" [pageCount]="selectedFile.thumbnails">
+      </app-pdf-viewer>
+    } @else if (activeViewer === 'pdfjs') {
+      <app-pdfjs-viewer
+        [documentId]="selectedFile.uniqueName"
+        [pageCount]="selectedFile.thumbnails"
+      >
+      </app-pdfjs-viewer>
+    }
   </div>
 }

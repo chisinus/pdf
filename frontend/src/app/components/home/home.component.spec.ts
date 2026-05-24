@@ -5,7 +5,8 @@ import { of } from 'rxjs';
 import { HomeComponent } from './home.component';
 import { FileService } from '../../services/file.service';
 import { UploadDialogComponent } from '../../upload-dialog/upload-dialog.component';
-import { PdfViewerComponent } from '../pdf-viewer/pdf-viewer.component';
+import { PdfViewerComponent as SimplePdfViewerComponent } from '../../modules/simple/pdf-viewer/pdf-viewer.component';
+import { PdfViewerComponent as PdfJsViewerComponent } from '../../modules/pdfjs/components/pdfjs-viewer/pdfjs-viewer.component';
 import { FileInfo } from '../../models/file-info.interface';
 
 describe('HomeComponent', () => {
@@ -32,7 +33,9 @@ describe('HomeComponent', () => {
       schemas: [NO_ERRORS_SCHEMA],
     })
       .overrideComponent(HomeComponent, {
-        remove: { imports: [UploadDialogComponent, PdfViewerComponent] },
+        remove: {
+          imports: [UploadDialogComponent, SimplePdfViewerComponent, PdfJsViewerComponent],
+        },
       })
       .compileComponents();
 
@@ -91,12 +94,22 @@ describe('HomeComponent', () => {
     const file = { name: 'doc.pdf', uniqueName: 'folder-1' } as FileInfo;
     component.openFile(file);
     expect(component.selectedFile).toEqual(file);
+    expect(component.activeViewer).toBe('simple');
+  });
+
+  it('should set selectedFile and activeViewer when openWithPdfJs is called', () => {
+    const file = { name: 'doc.pdf', uniqueName: 'folder-1' } as FileInfo;
+    component.openWithPdfJs(file);
+    expect(component.selectedFile).toEqual(file);
+    expect(component.activeViewer).toBe('pdfjs');
   });
 
   it('should clear selectedFile when closeViewer is called', () => {
     component.selectedFile = { name: 'doc.pdf', uniqueName: 'folder-1' } as FileInfo;
+    component.activeViewer = 'simple';
     component.closeViewer();
     expect(component.selectedFile).toBeNull();
+    expect(component.activeViewer).toBeNull();
   });
 
   it('should display upload dialog when upload button is clicked', () => {

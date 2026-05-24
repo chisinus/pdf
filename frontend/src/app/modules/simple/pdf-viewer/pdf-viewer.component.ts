@@ -6,7 +6,7 @@ import { ActivityBarComponent } from '../activity-bar/activity-bar.component';
 @Component({
   selector: 'app-pdf-viewer',
   templateUrl: './pdf-viewer.component.html',
-  styleUrls: ['./pdf-viewer.component.css'],
+  styleUrls: ['./pdf-viewer.component.scss'],
   standalone: true,
   imports: [ActivityBarComponent, PdfContentComponent, ThumbnailSidebarComponent],
 })
