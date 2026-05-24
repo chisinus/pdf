@@ -541,7 +541,7 @@ Avoid these patterns:
 
 ## Thumbnail APIs
 
-- [ ] `GET /documents/:id/thumbnails/:pageNumber`
+- [ ] `GET /documents/thumbnails/:id/:page`
 - [ ] or direct static/object-storage URLs
 
 ---

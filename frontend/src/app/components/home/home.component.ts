@@ -30,7 +30,6 @@ export class HomeComponent implements OnInit {
       .getFiles()
       .pipe(untilDestroyed(this))
       .subscribe((f) => {
-        console.log('>>>>>>>>>>>>>> Files loaded:', f);
         this.files = f;
       });
   }

@@ -118,7 +118,7 @@ public class PdfController : ControllerBase
         return Content(json, "application/json");
     }
 
-    [HttpGet("/thumbnails/{page}/{id}")]
+    [HttpGet("thumbnails/{id}/{page}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetThumbnail(string id, int page)

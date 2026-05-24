@@ -7,14 +7,14 @@ import {
   SimpleChanges,
   ViewChild,
 } from '@angular/core';
-import { CdkVirtualScrollViewport } from '@angular/cdk/scrolling';
+import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
 
 @Component({
   selector: 'app-thumbnail-sidebar',
   templateUrl: './thumbnail-sidebar.component.html',
-  styleUrls: ['./thumbnail-sidebar.component.css'],
+  styleUrls: ['./thumbnail-sidebar.component.scss'],
   standalone: true,
-  imports: [CdkVirtualScrollViewport],
+  imports: [ScrollingModule],
 })
 export class ThumbnailSidebarComponent implements OnChanges {
   @Input() documentId!: string;
@@ -36,8 +36,8 @@ export class ThumbnailSidebarComponent implements OnChanges {
   }
 
   handleImageError(event: Event) {
-    const img = event.target as HTMLImageElement;
-    img.src = 'assets/thumbnail-placeholder.png';
+    // const img = event.target as HTMLImageElement;
+    // img.src = 'assets/thumbnail-placeholder.png';
   }
 
   selectPage(page: number) {

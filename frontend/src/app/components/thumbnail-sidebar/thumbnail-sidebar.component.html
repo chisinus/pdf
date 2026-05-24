@@ -1,4 +1,3 @@
-<p>thumbnail-sidebar works!</p>
 <div class="sidebar-container">
   <cdk-virtual-scroll-viewport itemSize="200" class="scroll-viewport">
     <div
@@ -9,7 +8,7 @@
     >
       <div class="page-label">Page {{ page }}</div>
       <img
-        [src]="'/api/pdf/' + documentId + '/thumbnails/' + page"
+        [src]="'http://localhost:3001/api/thumbnails/' + documentId + '/' + page"
         alt="Page {{ page }}"
         class="thumbnail-image"
         (error)="handleImageError($event)"
