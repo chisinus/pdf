@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { HomeComponent } from './home.component';
 import { FileService } from '../../services/file.service';
 import { UploadDialogComponent } from '../../upload-dialog/upload-dialog.component';
+import { PdfViewerComponent } from '../pdf-viewer/pdf-viewer.component';
 import { FileInfo } from '../../models/file-info.interface';
 
 describe('HomeComponent', () => {
@@ -31,7 +32,7 @@ describe('HomeComponent', () => {
       schemas: [NO_ERRORS_SCHEMA],
     })
       .overrideComponent(HomeComponent, {
-        remove: { imports: [UploadDialogComponent] },
+        remove: { imports: [UploadDialogComponent, PdfViewerComponent] },
       })
       .compileComponents();
 
@@ -86,28 +87,16 @@ describe('HomeComponent', () => {
     expect(fileServiceMock.deleteFile).not.toHaveBeenCalled();
   });
 
-  it('should open file in a new window if url exists', () => {
-    const file = {
-      name: 'doc.pdf',
-      uniqueName: 'folder-1',
-      url: 'http://test.com/doc.pdf',
-      size: 100,
-      thumbnails: 1,
-    } as FileInfo;
+  it('should set selectedFile when openFile is called', () => {
+    const file = { name: 'doc.pdf', uniqueName: 'folder-1' } as FileInfo;
     component.openFile(file);
-    expect(window.open).toHaveBeenCalledWith('http://test.com/doc.pdf', '_blank');
+    expect(component.selectedFile).toEqual(file);
   });
 
-  it('should not open file if url is falsy', () => {
-    const file = {
-      name: 'doc.pdf',
-      uniqueName: 'folder-1',
-      url: '',
-      size: 100,
-      thumbnails: 1,
-    } as FileInfo;
-    component.openFile(file);
-    expect(window.open).not.toHaveBeenCalled();
+  it('should clear selectedFile when closeViewer is called', () => {
+    component.selectedFile = { name: 'doc.pdf', uniqueName: 'folder-1' } as FileInfo;
+    component.closeViewer();
+    expect(component.selectedFile).toBeNull();
   });
 
   it('should display upload dialog when upload button is clicked', () => {

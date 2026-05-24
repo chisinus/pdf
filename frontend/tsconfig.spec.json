@@ -2,7 +2,17 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
-    "types": ["jest"]
+
+    // Override CommonJS inherited from tsconfig.json
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+
+    // Jest typings
+    "types": ["jest", "node"],
+
+    // Required for Jest + ESM
+    "esModuleInterop": true,
+    "allowJs": true
   },
   "include": ["src/**/*.d.ts", "src/**/*.spec.ts"]
 }

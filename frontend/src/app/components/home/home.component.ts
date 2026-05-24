@@ -1,38 +1,54 @@
 import { Component, OnInit } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
+import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { UploadDialogComponent } from '../../upload-dialog/upload-dialog.component';
+import { PdfViewerComponent } from '../pdf-viewer/pdf-viewer.component';
 import { FileService } from '../../services/file.service';
 import { FileInfo } from '../../models/file-info.interface';
 
+@UntilDestroy()
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
-  styleUrls: ['./home.component.css'],
+  styleUrls: ['./home.component.scss'],
   standalone: true,
-  imports: [UploadDialogComponent],
+  imports: [DecimalPipe, UploadDialogComponent, PdfViewerComponent],
 })
 export class HomeComponent implements OnInit {
   files: FileInfo[] = [];
   showUpload = false;
+  selectedFile: FileInfo | null = null;
 
   constructor(private fileService: FileService) {}
 
   ngOnInit(): void {
-    // this.loadFiles();
+    this.loadFiles();
   }
 
   loadFiles() {
-    this.fileService.getFiles().subscribe((f) => (this.files = f));
+    this.fileService
+      .getFiles()
+      .pipe(untilDestroyed(this))
+      .subscribe((f) => {
+        console.log('>>>>>>>>>>>>>> Files loaded:', f);
+        this.files = f;
+      });
   }
 
   deleteFile(id: string) {
     if (!confirm('Delete file?')) return;
-    this.fileService.deleteFile(id).subscribe(() => this.loadFiles());
+    this.fileService
+      .deleteFile(id)
+      .pipe(untilDestroyed(this))
+      .subscribe(() => this.loadFiles());
   }
 
   openFile(f: FileInfo) {
-    if (f.url) {
-      window.open(f.url, '_blank');
-    }
+    this.selectedFile = f;
+  }
+
+  closeViewer() {
+    this.selectedFile = null;
   }
 
   onUploadClicked() {

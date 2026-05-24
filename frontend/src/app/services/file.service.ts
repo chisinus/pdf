@@ -1,11 +1,11 @@
-import { Injectable } from "@angular/core";
-import { HttpClient } from "@angular/common/http";
-import { Observable } from "rxjs";
-import { FileInfo } from "../models/file-info.interface";
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { FileInfo } from '../models/file-info.interface';
 
-@Injectable({ providedIn: "root" })
+@Injectable({ providedIn: 'root' })
 export class FileService {
-  private api = "/api";
+  private api = 'http://localhost:3001/api';
   constructor(private http: HttpClient) {}
 
   getFiles(): Observable<FileInfo[]> {
@@ -14,7 +14,7 @@ export class FileService {
 
   upload(file: File): Observable<any> {
     const fd = new FormData();
-    fd.append("file", file, file.name);
+    fd.append('file', file, file.name);
     return this.http.post(`${this.api}/upload`, fd);
   }
 

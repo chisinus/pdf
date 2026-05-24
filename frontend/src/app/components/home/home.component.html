@@ -1,33 +1,45 @@
-<div>
-  <button class="button" (click)="onUploadClicked()">Upload</button>
-  @if (files.length) {
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Org File Name</th>
-          <th>File Name</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (f of files; track f) {
+@if (!selectedFile) {
+  <div>
+    <button class="button" (click)="onUploadClicked()">Upload</button>
+    @if (files.length) {
+      <table class="table">
+        <thead>
           <tr>
-            <td>{{ f.orgFileName }}</td>
-            <td>{{ f.fileName }}</td>
-            <td>
-              <button class="button" (click)="deleteFile(f.id)">Delete</button>
-              <button class="button" (click)="openFile(f)">Open</button>
-            </td>
+            <th>Original File Name</th>
+            <th>File Name</th>
+            <th>File Size (MB)</th>
+            <th>Thumbnails</th>
+            <th>Actions</th>
           </tr>
-        }
-      </tbody>
-    </table>
-  }
-  @if (!files.length) {
-    <p>No files</p>
-  }
+        </thead>
+        <tbody>
+          @for (f of files; track f) {
+            <tr>
+              <td>{{ f.name }}</td>
+              <td>{{ f.uniqueName }}</td>
+              <td>{{ f.size / 1024 / 1024 | number: '1.2-2' }}</td>
+              <td>{{ f.thumbnails }}</td>
+              <td>
+                <button class="button" (click)="deleteFile(f.uniqueName)">Delete</button>
+                <button class="button" (click)="openFile(f)">Open</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+    @if (!files.length) {
+      <p>No files</p>
+    }
 
-  @if (showUpload) {
-    <app-upload-dialog (close)="onUploadFinished($event)"></app-upload-dialog>
-  }
-</div>
+    @if (showUpload) {
+      <app-upload-dialog (close)="onUploadFinished($event)"></app-upload-dialog>
+    }
+  </div>
+} @else {
+  <div>
+    <button class="button" (click)="closeViewer()">Back to List</button>
+    <app-pdf-viewer [documentId]="selectedFile.uniqueName" [pageCount]="selectedFile.thumbnails">
+    </app-pdf-viewer>
+  </div>
+}

@@ -2,9 +2,9 @@
   "compileOnSave": false,
   "compilerOptions": {
     "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "node",
-    "ignoreDeprecations": "6.0",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "ignoreDeprecations": "5.0",
     "useDefineForClassFields": false,
     "lib": ["ES2022", "dom"],
     "experimentalDecorators": true,

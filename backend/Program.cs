@@ -10,6 +10,18 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<PdfProcessingQueue>();
 builder.Services.AddHostedService<PdfProcessingBackgroundService>();
 
+// Add CORS configuration
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAngularDev", policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .WithExposedHeaders("Content-Disposition"); // Expose headers often used for file downloads
+    });
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -17,6 +29,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseCors("AllowAngularDev");
 
 app.UseAuthorization();
 app.MapControllers();

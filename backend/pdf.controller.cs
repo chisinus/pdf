@@ -52,21 +52,21 @@ public class PdfController : ControllerBase
 
     [HttpGet]
     [Route("files")]
-    [ProducesResponseType(typeof(IEnumerable<FileInfo>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult GetFiles()
     {
-        var files = new List<FileInfo>();
+        var files = new List<object>();
         foreach (var dir in Directory.GetDirectories(_uploadFolder))
         {
             var dirInfo = new DirectoryInfo(dir);
             var pdfFile = dirInfo.GetFiles("*.pdf").FirstOrDefault();
             if (pdfFile != null)
             {
-                files.Add(new FileInfo
+                files.Add(new
                 {
-                    Name = dirInfo.Name,
-                    PDFName = pdfFile.Name,
-                    Url = $"/api/pdf/{dirInfo.Name}/download",
+                    UniqueName = dirInfo.Name,
+                    Name = pdfFile.Name,
+                    Url = $"http://localhost:3001/api/download/{dirInfo.Name}",
                     Size = pdfFile.Length,
                     Thumbnails = dirInfo.GetFiles("thumbnail.*.png").Length
                 });
