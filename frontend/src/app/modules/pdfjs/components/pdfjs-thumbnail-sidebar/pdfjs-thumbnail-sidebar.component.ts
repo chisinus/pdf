@@ -25,6 +25,7 @@ export class PdfjsThumbnailSidebarComponent implements OnChanges {
   pages: number[] = [];
 
   @ViewChild(CdkVirtualScrollViewport) viewport!: CdkVirtualScrollViewport;
+  private suppressNextScroll = false;
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['pageCount'] && this.pageCount > 0) {
@@ -32,8 +33,14 @@ export class PdfjsThumbnailSidebarComponent implements OnChanges {
     }
 
     if (changes['activePage'] && this.viewport) {
-      // Jump immediately to the active thumbnail (no smooth animation)
-      this.viewport.scrollToIndex(this.activePage - 1);
+      // If the change originated from a local click, skip scrolling so the
+      // thumbnail stays in its current position. Otherwise, jump immediately
+      // to the active thumbnail (no smooth animation).
+      if (this.suppressNextScroll) {
+        this.suppressNextScroll = false;
+      } else {
+        this.viewport.scrollToIndex(this.activePage - 1);
+      }
     }
   }
 
@@ -42,6 +49,9 @@ export class PdfjsThumbnailSidebarComponent implements OnChanges {
   }
 
   selectPage(page: number) {
+    // Prevent the sidebar from auto-scrolling the clicked thumbnail to the
+    // top — let it remain visually where the user clicked.
+    this.suppressNextScroll = true;
     this.pageSelected.emit(page);
   }
 }
