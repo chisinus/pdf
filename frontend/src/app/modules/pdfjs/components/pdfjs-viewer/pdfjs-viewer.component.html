@@ -1,11 +1,9 @@
 <div class="toolbar">
-  <button (click)="enablePen()">Pen</button>
-  <button (click)="enableText()">Text</button>
-  <button (click)="enableRect()">Rectangle</button>
-  <button (click)="enableArrow()">Arrow</button>
-  <button (click)="enableHighlight()">Highlight</button>
-  <button (click)="disableEdit()">Select</button>
-  <button (click)="saveAnnotations()">Save</button>
+  <button (click)="setTool('pen')">Pen</button>
+  <button (click)="setTool('rect')">Rectangle</button>
+  <button (click)="setTool('arrow')">Arrow</button>
+  <button (click)="setTool('text')">Text</button>
+  <button (click)="setTool(null)">Select</button>
 </div>
 
-<div #pdfContainer class="pdf-container"></div>
+<div #container class="pdf-container"></div>

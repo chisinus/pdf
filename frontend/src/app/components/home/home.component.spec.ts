@@ -6,7 +6,7 @@ import { HomeComponent } from './home.component';
 import { FileService } from '../../services/file.service';
 import { UploadDialogComponent } from '../../upload-dialog/upload-dialog.component';
 import { PdfViewerComponent as SimplePdfViewerComponent } from '../../modules/simple/pdf-viewer/pdf-viewer.component';
-import { PdfViewerComponent as PdfJsViewerComponent } from '../../modules/pdfjs/components/pdfjs-viewer/pdfjs-viewer.component';
+import { PdfjsViewerComponent as PdfJsViewerComponent } from '../../modules/pdfjs/components/pdfjs-viewer/pdfjs-viewer.component';
 import { FileInfo } from '../../models/file-info.interface';
 
 describe('HomeComponent', () => {

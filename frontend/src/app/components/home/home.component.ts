@@ -2,8 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { UploadDialogComponent } from '../../upload-dialog/upload-dialog.component';
-import { PdfViewerComponent as SimplePdfViewerComponent } from '../../modules/simple/pdf-viewer/pdf-viewer.component';
-import { PdfViewerComponent as PdfJsViewerComponent } from '../../modules/pdfjs/components/pdfjs-viewer/pdfjs-viewer.component';
+import { PdfViewerComponent } from '../../modules/simple/pdf-viewer/pdf-viewer.component';
+import { PdfjsViewerComponent as PdfJsViewerComponent } from '../../modules/pdfjs/components/pdfjs-viewer/pdfjs-viewer.component';
 import { FileService } from '../../services/file.service';
 import { FileInfo } from '../../models/file-info.interface';
 
@@ -13,7 +13,7 @@ import { FileInfo } from '../../models/file-info.interface';
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss'],
   standalone: true,
-  imports: [DecimalPipe, UploadDialogComponent, SimplePdfViewerComponent, PdfJsViewerComponent],
+  imports: [DecimalPipe, UploadDialogComponent, PdfViewerComponent, PdfJsViewerComponent],
 })
 export class HomeComponent implements OnInit {
   files: FileInfo[] = [];
