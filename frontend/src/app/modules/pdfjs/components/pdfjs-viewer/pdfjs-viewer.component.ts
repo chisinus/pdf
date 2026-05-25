@@ -8,39 +8,12 @@ import {
   NgZone,
 } from '@angular/core';
 
-import * as pdfjsLib from 'pdfjs-dist';
+import { PdfjsService } from '../../services/pdfjs.service';
 import { AnnotationService } from '../../services/annotation.service';
 
-// Extract the browser's native Promise to bypass Angular's ZoneAwarePromise
-const NativePromise = (async () => {})().constructor as PromiseConstructor;
 
-// Polyfills for modern Promise methods required by pdfjs-dist but missing in Angular's zone.js
-if (!(Promise as any).try) {
-  (Promise as any).try = function (fn: any) {
-    return new NativePromise((resolve, reject) => {
-      try {
-        resolve(fn());
-      } catch (e) {
-        reject(e);
-      }
-    });
-  };
-}
-if (!(Promise as any).withResolvers) {
-  (Promise as any).withResolvers = function () {
-    let resolve, reject;
-    const promise = new NativePromise((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-    return { promise, resolve, reject };
-  };
-}
-
-// Use the bundled worker by default, but allow disabling the worker entirely
-// during troubleshooting. For now set `disableWorker = true` to avoid
-// worker-side stream/handshake errors until the worker integration is validated.
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.mjs';
+// Use the PDF.js legacy build and a fake-worker integration to avoid the
+// worker stream handshake bug in this Angular app.
 
 @Component({
   selector: 'app-pdfjs-viewer',
@@ -64,22 +37,19 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
   private observer: IntersectionObserver | null = null;
   private renderedPages = new Set<number>();
 
-  private annotationService: AnnotationService = new AnnotationService();
-
-  constructor(private ngZone: NgZone) {}
+  constructor(
+    private ngZone: NgZone,
+    private pdfjsService: PdfjsService,
+    private annotationService: AnnotationService,
+  ) {}
 
   async ngAfterViewInit() {
     if (!this.documentId) return;
 
     this.ngZone.runOutsideAngular(async () => {
-      const url = `http://localhost:3001/api/download/${this.documentId}`;
+      const url = `http://localhost:4001/api/download/${this.documentId}`;
 
-      // Load PDF directly but disable streaming to avoid worker stream-handshake bugs
-      // (quick workaround: prevents pdf.worker from using stream sink controllers)
-      // Disable both streaming and range requests to avoid worker stream-handshake
-      // code paths that may trigger `onPull` assignment on an undefined sink.
-      const loadingTask = pdfjsLib.getDocument({ url, disableStream: true, disableRange: true });
-      const pdf = await loadingTask.promise;
+      const pdf = await this.pdfjsService.loadDocument(url);
       this.pdfDoc = pdf;
 
       // Get the first page to estimate placeholder dimensions
