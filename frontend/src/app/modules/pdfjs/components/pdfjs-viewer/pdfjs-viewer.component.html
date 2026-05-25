@@ -1,9 +1,22 @@
-<div class="toolbar">
-  <button (click)="setTool('pen')">Pen</button>
-  <button (click)="setTool('rect')">Rectangle</button>
-  <button (click)="setTool('arrow')">Arrow</button>
-  <button (click)="setTool('text')">Text</button>
-  <button (click)="setTool(null)">Select</button>
-</div>
+<div class="viewer-layout">
+  <aside class="activity-bar">
+    <div class="toolbar-title">Tools</div>
+    <button (click)="setTool('pen')">Pen</button>
+    <button (click)="setTool('rect')">Rectangle</button>
+    <button (click)="setTool('arrow')">Arrow</button>
+    <button (click)="setTool('text')">Text</button>
+    <button (click)="setTool(null)">Select</button>
+  </aside>
 
-<div #container class="pdf-container"></div>
+  <section class="viewer-main" #scrollContainer>
+    <div #container class="pdf-container"></div>
+  </section>
+
+  <app-pdfjs-thumbnail-sidebar
+    class="thumbnail-sidebar"
+    [documentId]="documentId"
+    [pageCount]="numPages || pageCount"
+    [activePage]="currentVisiblePage"
+    (pageSelected)="scrollToPage($event)"
+  ></app-pdfjs-thumbnail-sidebar>
+</div>

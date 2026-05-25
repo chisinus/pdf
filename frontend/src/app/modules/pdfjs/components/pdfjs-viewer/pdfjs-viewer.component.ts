@@ -6,11 +6,12 @@ import {
   ViewChild,
   Input,
   NgZone,
+  ChangeDetectorRef,
 } from '@angular/core';
 
 import { PdfjsService } from '../../services/pdfjs.service';
 import { AnnotationService } from '../../services/annotation.service';
-
+import { PdfjsThumbnailSidebarComponent } from '../pdfjs-thumbnail-sidebar/pdfjs-thumbnail-sidebar.component';
 
 // Use the PDF.js legacy build and a fake-worker integration to avoid the
 // worker stream handshake bug in this Angular app.
@@ -20,12 +21,17 @@ import { AnnotationService } from '../../services/annotation.service';
   templateUrl: './pdfjs-viewer.component.html',
   styleUrls: ['./pdfjs-viewer.component.scss'],
   standalone: true,
+  imports: [PdfjsThumbnailSidebarComponent],
 })
 export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
   @Input() documentId!: string;
   @Input() pageCount: number = 0;
 
   @ViewChild('container', { static: true }) container!: ElementRef;
+  @ViewChild('scrollContainer', { static: true }) scrollContainer!: ElementRef;
+
+  currentVisiblePage: number = 1;
+  numPages: number = 0;
 
   private isDrawing = false;
   private startX = 0;
@@ -41,6 +47,7 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
     private ngZone: NgZone,
     private pdfjsService: PdfjsService,
     private annotationService: AnnotationService,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   async ngAfterViewInit() {
@@ -51,6 +58,7 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
 
       const pdf = await this.pdfjsService.loadDocument(url);
       this.pdfDoc = pdf;
+      this.numPages = pdf.numPages;
 
       // Get the first page to estimate placeholder dimensions
       const firstPage = await pdf.getPage(1);
@@ -58,19 +66,56 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
       const defaultWidth = viewport.width;
       const defaultHeight = viewport.height;
 
-      // Setup IntersectionObserver to only render visible pages
+      // Setup IntersectionObserver to only render visible pages inside the scroll container
       this.observer = new IntersectionObserver(
         (entries) => {
+          // Compute visible area for each page wrapper and choose the page
+          // with the largest intersection area inside the scroll container.
+          const scrollEl = this.scrollContainer.nativeElement as HTMLElement;
+          const containerRect = scrollEl.getBoundingClientRect();
+
+          const wrappers = Array.from(
+            this.container.nativeElement.querySelectorAll('.page-wrapper'),
+          ) as HTMLElement[];
+
+          let bestWrapper: HTMLElement | null = null;
+          let bestArea = -1;
+
+          wrappers.forEach((w) => {
+            const r = w.getBoundingClientRect();
+            const intersectTop = Math.max(r.top, containerRect.top);
+            const intersectBottom = Math.min(r.bottom, containerRect.bottom);
+            const intersectHeight = Math.max(0, intersectBottom - intersectTop);
+            const intersectWidth = Math.max(0, Math.min(r.right, containerRect.right) - Math.max(r.left, containerRect.left));
+            const area = intersectHeight * intersectWidth;
+            if (area > bestArea) {
+              bestArea = area;
+              bestWrapper = w;
+            }
+          });
+
+          if (bestWrapper && bestArea > 0) {
+            const pageNum = Number((bestWrapper as HTMLElement).getAttribute('data-page-number'));
+            this.ngZone.run(() => {
+              this.currentVisiblePage = pageNum;
+              this.cdr.markForCheck();
+            });
+
+            this.loadAndRenderPage(pageNum, bestWrapper);
+          }
+
+          // Cleanup pages that are not intersecting
           entries.forEach((entry) => {
-            const pageNum = Number(entry.target.getAttribute('data-page-number'));
-            if (entry.isIntersecting) {
-              this.loadAndRenderPage(pageNum, entry.target as HTMLElement);
-            } else {
-              this.cleanupPage(pageNum, entry.target as HTMLElement);
+            if (!entry.isIntersecting) {
+              const pn = Number(entry.target.getAttribute('data-page-number'));
+              this.cleanupPage(pn, entry.target as HTMLElement);
             }
           });
         },
-        { rootMargin: '1000px 0px' },
+        {
+          root: this.scrollContainer.nativeElement,
+          rootMargin: '1000px 0px',
+        },
       ); // Preload pages 1000px before they appear
 
       // Create placeholders for all pages
@@ -240,6 +285,33 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
       y2 - headLength * Math.sin(angle + Math.PI / 6),
     );
     ctx.stroke();
+  }
+
+  scrollToPage(pageNum: number) {
+    this.ngZone.run(() => {
+      this.currentVisiblePage = pageNum;
+      this.cdr.markForCheck();
+    });
+
+    const wrapper = this.container.nativeElement.querySelector(
+      `[data-page-number="${pageNum}"]`,
+    ) as HTMLElement | null;
+    if (!wrapper) {
+      return;
+    }
+
+    const scrollElement = this.scrollContainer.nativeElement as HTMLElement;
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const containerRect = scrollElement.getBoundingClientRect();
+
+    const fullyVisible =
+      wrapperRect.top >= containerRect.top && wrapperRect.bottom <= containerRect.bottom;
+    if (fullyVisible) {
+      return;
+    }
+
+    const targetTop = wrapper.offsetTop;
+    scrollElement.scrollTop = targetTop;
   }
 
   setTool(tool: any) {
