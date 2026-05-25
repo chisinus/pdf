@@ -5,7 +5,7 @@ import { FileInfo } from '../models/file-info.interface';
 
 @Injectable({ providedIn: 'root' })
 export class FileService {
-  private api = 'http://localhost:3001/api';
+  private api = 'http://localhost:4001/api';
   constructor(private http: HttpClient) {}
 
   getFiles(): Observable<FileInfo[]> {

@@ -8,7 +8,7 @@
     >
       <div class="page-label">Page {{ page }}</div>
       <img
-        [src]="'http://localhost:3001/api/thumbnails/' + documentId + '/' + page"
+        [src]="'http://localhost:4001/api/thumbnails/' + documentId + '/' + page"
         alt="Page {{ page }}"
         class="thumbnail-image"
         (error)="handleImageError($event)"

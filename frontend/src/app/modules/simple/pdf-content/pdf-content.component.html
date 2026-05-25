@@ -15,7 +15,7 @@
       <!-- Render the actual page image if it's within the visible buffer -->
       @if (isPageRendered(page)) {
         <img
-          [src]="'http://localhost:3001/api/thumbnails/' + documentId + '/' + page"
+          [src]="'http://localhost:4001/api/thumbnails/' + documentId + '/' + page"
           alt="Page {{ page }}"
           style="display: block; width: 100%; min-width: 400px; user-select: none"
           (dragstart)="$event.preventDefault()"

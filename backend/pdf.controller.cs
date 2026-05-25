@@ -66,7 +66,7 @@ public class PdfController : ControllerBase
                 {
                     UniqueName = dirInfo.Name,
                     Name = pdfFile.Name,
-                    Url = $"http://localhost:3001/api/download/{dirInfo.Name}",
+                    Url = $"http://localhost:4001/api/download/{dirInfo.Name}",
                     Size = pdfFile.Length,
                     Thumbnails = dirInfo.GetFiles("thumbnail.*.png").Length
                 });
