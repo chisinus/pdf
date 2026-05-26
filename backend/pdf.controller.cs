@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PDFBackend.Services;
+using System.Runtime;
 using System.Text.Json;
 using FileInfo = PDFBackend.Models.FileInfo;
 
@@ -13,6 +14,10 @@ public class PdfController : ControllerBase
     private const long MaxUploadBytes = 500 * 1024 * 1024; // 500 MB
     private readonly string _uploadFolder;
     private readonly PdfProcessingQueue _queue;
+
+    private static bool IsTemporaryPdf(System.IO.FileInfo file) =>
+        file.Name.EndsWith(".tmp.pdf", StringComparison.OrdinalIgnoreCase) ||
+        file.Name.EndsWith(".qpdf.pdf", StringComparison.OrdinalIgnoreCase);
 
     public PdfController(PdfProcessingQueue queue)
     {
@@ -63,7 +68,10 @@ public class PdfController : ControllerBase
         foreach (var dir in Directory.GetDirectories(_uploadFolder))
         {
             var dirInfo = new DirectoryInfo(dir);
-            var pdfFile = dirInfo.GetFiles("*.pdf").FirstOrDefault();
+            var pdfFile = dirInfo
+                .GetFiles("*.pdf")
+                .FirstOrDefault(f=>!IsTemporaryPdf(f));
+
             if (pdfFile != null)
             {
                 int pageCount = 0;
@@ -117,7 +125,10 @@ public class PdfController : ControllerBase
         var folderPath = Path.Combine(_uploadFolder, id);
         if (!Directory.Exists(folderPath)) return NotFound();
 
-        var pdfFile = new DirectoryInfo(folderPath).GetFiles("*.pdf").FirstOrDefault();
+        var pdfFile = new DirectoryInfo(folderPath)
+            .GetFiles("*.pdf")
+            .FirstOrDefault(f => !IsTemporaryPdf(f));
+
         if (pdfFile == null) return NotFound();
 
         // PhysicalFile with enableRangeProcessing: true supports 206 Partial Content (Byte-Range requests)

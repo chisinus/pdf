@@ -13,9 +13,6 @@ import { PdfjsService } from '../../services/pdfjs.service';
 import { AnnotationService } from '../../services/annotation.service';
 import { PdfjsThumbnailSidebarComponent } from '../pdfjs-thumbnail-sidebar/pdfjs-thumbnail-sidebar.component';
 
-// Use the PDF.js legacy build and a fake-worker integration to avoid the
-// worker stream handshake bug in this Angular app.
-
 @Component({
   selector: 'app-pdfjs-viewer',
   templateUrl: './pdfjs-viewer.component.html',
@@ -86,7 +83,10 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
             const intersectTop = Math.max(r.top, containerRect.top);
             const intersectBottom = Math.min(r.bottom, containerRect.bottom);
             const intersectHeight = Math.max(0, intersectBottom - intersectTop);
-            const intersectWidth = Math.max(0, Math.min(r.right, containerRect.right) - Math.max(r.left, containerRect.left));
+            const intersectWidth = Math.max(
+              0,
+              Math.min(r.right, containerRect.right) - Math.max(r.left, containerRect.left),
+            );
             const area = intersectHeight * intersectWidth;
             if (area > bestArea) {
               bestArea = area;

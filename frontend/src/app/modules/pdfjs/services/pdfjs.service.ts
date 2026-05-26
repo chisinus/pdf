@@ -1,6 +1,9 @@
 import { Injectable } from '@angular/core';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
+const PDFJS_WASM_URL = 'https://unpkg.com/pdfjs-dist@5.7.284/WASM/;
+const PDFJS_WORKER_SRC = '/assets/pdf.worker.min.mjs';
+
 const NativePromise = (async () => {})().constructor as PromiseConstructor;
 
 function ensurePromisePolyfills() {
@@ -33,28 +36,34 @@ function ensurePromisePolyfills() {
 export class PdfjsService {
   constructor() {
     ensurePromisePolyfills();
+
+    // Use the real worker and provie wasm assets so JBIG2/CCITT images decode correctly.
+    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
   }
 
-  private async ensureFakeWorker() {
-    const globalPdfjsWorker = (globalThis as any).pdfjsWorker as
-      | { WorkerMessageHandler?: any }
-      | undefined;
+  // Use a fake worker integration to avoid the worker stream handshake bug in this Angular app.
+  // It has file size limitations, but it works for small files.
+  // private async ensureFakeWorker() {
+  //   const globalPdfjsWorker = (globalThis as any).pdfjsWorker as
+  //     | { WorkerMessageHandler?: any }
+  //     | undefined;
 
-    if (globalPdfjsWorker?.WorkerMessageHandler) {
-      return;
-    }
+  //   if (globalPdfjsWorker?.WorkerMessageHandler) {
+  //     return;
+  //   }
 
-    const workerModule = await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs');
-    (globalThis as any).pdfjsWorker = {
-      ...globalPdfjsWorker,
-      WorkerMessageHandler: workerModule.WorkerMessageHandler,
-    };
-  }
+  //   const workerModule = await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs');
+  //   (globalThis as any).pdfjsWorker = {
+  //     ...globalPdfjsWorker,
+  //     WorkerMessageHandler: workerModule.WorkerMessageHandler,
+  //   };
+  // }
 
   async loadDocument(url: string) {
-    await this.ensureFakeWorker();
+    // await this.ensureFakeWorker();
     return pdfjsLib.getDocument({
       url,
+      wasmUrl: PDFJS_WASM_URL,    // Real wasm only
       disableStream: true,
       disableRange: true,
     }).promise;
