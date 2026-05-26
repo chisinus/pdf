@@ -19,6 +19,6 @@ export class FileService {
   }
 
   deleteFile(id: string): Observable<any> {
-    return this.http.delete(`${this.api}/files/${id}`);
+    return this.http.delete(`${this.api}/delete/${id}`);
   }
 }

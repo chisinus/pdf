@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PDFBackend.Services;
+using System.Text.Json;
 using FileInfo = PDFBackend.Models.FileInfo;
 
 namespace PDFBackend.Controllers;
@@ -9,6 +10,7 @@ namespace PDFBackend.Controllers;
 [Route("api")]
 public class PdfController : ControllerBase
 {
+    private const long MaxUploadBytes = 500 * 1024 * 1024; // 500 MB
     private readonly string _uploadFolder;
     private readonly PdfProcessingQueue _queue;
 
@@ -25,6 +27,8 @@ public class PdfController : ControllerBase
 
     [HttpPost]
     [Route("upload")]
+    [RequestSizeLimit(MaxUploadBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxUploadBytes)]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Upload(IFormFile file)
@@ -62,13 +66,27 @@ public class PdfController : ControllerBase
             var pdfFile = dirInfo.GetFiles("*.pdf").FirstOrDefault();
             if (pdfFile != null)
             {
+                int pageCount = 0;
+                var metadataPath = Path.Combine(dir, "pages-metadata.json");
+                if (System.IO.File.Exists(metadataPath))
+                {
+                    try
+                    {
+                        var json = System.IO.File.ReadAllText(metadataPath);
+                        using var doc = JsonDocument.Parse(json);
+                        if (doc.RootElement.TryGetProperty("pageCount", out var pc)) pageCount = pc.GetInt32();
+                        else if (doc.RootElement.TryGetProperty("PageCount", out var pc2)) pageCount = pc2.GetInt32();
+                    }
+                    catch { /* Ignore parsing errors */ }
+                }
+
                 files.Add(new
                 {
                     UniqueName = dirInfo.Name,
                     Name = pdfFile.Name,
                     Url = $"http://localhost:4001/api/download/{dirInfo.Name}",
                     Size = pdfFile.Length,
-                    Thumbnails = dirInfo.GetFiles("thumbnail.*.png").Length
+                    Thumbnails = pageCount > 0 ? pageCount : dirInfo.GetFiles("thumbnail.*.jpg").Length
                 });
             }
         }
@@ -123,9 +141,9 @@ public class PdfController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetThumbnail(string id, int page)
     {
-        var thumbPath = Path.Combine(_uploadFolder, id, $"thumbnail.{page}.png");
+        var thumbPath = Path.Combine(_uploadFolder, id, $"thumbnail.{page}.jpg");
         if (!System.IO.File.Exists(thumbPath)) return NotFound();
 
-        return PhysicalFile(thumbPath, "image/png");
+        return PhysicalFile(thumbPath, "image/jpeg");
     }
 }

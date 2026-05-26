@@ -198,10 +198,14 @@ public class PdfProcessingBackgroundService : BackgroundService
                 if (images.Count > 0)
                 {
                     var image = images[0];
-                    image.Format = MagickFormat.Png;
+                    // Replace transparent PDF backgrounds with white before converting to JPEG
+                    image.BackgroundColor = MagickColors.White;
+                    image.Alpha(AlphaOption.Remove);
+
+                    image.Format = MagickFormat.Jpeg;
                     image.Resize(400, 0); // 400px width, keeping aspect ratio
 
-                    var thumbPath = Path.Combine(folderPath, $"thumbnail.{i + 1}.png");
+                    var thumbPath = Path.Combine(folderPath, $"thumbnail.{i + 1}.jpg");
                     image.Write(thumbPath);
                 }
             });

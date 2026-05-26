@@ -1,6 +1,24 @@
 using PDFBackend.Services;
+using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
+
+const long MaxUploadBytes = 500 * 1024 * 1024; // 500 MB
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = MaxUploadBytes;
+    options.Limits.MaxRequestBufferSize = MaxUploadBytes;
+    options.Limits.MaxRequestHeadersTotalSize = 32 * 1024; // 32 KB
+    options.Limits.MaxRequestLineSize = 8 * 1024; // 8 KB
+});
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = MaxUploadBytes; // Set the limit for multipart form data
+    options.ValueLengthLimit = int.MaxValue; // Set the limit for individual form values
+    options.MultipartHeadersLengthLimit = int.MaxValue; // Set the limit for multipart headers
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
