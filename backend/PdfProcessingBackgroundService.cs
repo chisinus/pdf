@@ -9,6 +9,7 @@ public class PdfProcessingBackgroundService : BackgroundService
 {
     private readonly PdfProcessingQueue _queue;
     private readonly ILogger<PdfProcessingBackgroundService> _logger;
+    private static readonly SemaphoreSlim GhostscriptSemaphore = new SemaphoreSlim(2, 2); // Max 2 concurrent Ghostscript operations
 
     public PdfProcessingBackgroundService(PdfProcessingQueue queue, ILogger<PdfProcessingBackgroundService> logger)
     {
@@ -54,7 +55,8 @@ public class PdfProcessingBackgroundService : BackgroundService
                 _logger.LogInformation("Generating thumbnails...");
                 var thumbWatch = Stopwatch.StartNew();
                 var preThumbMemory = currentProcess.WorkingSet64;
-                await GenerateThumbnailsAsync(pdfFile.FullName, folderPath, stoppingToken);
+                await GenerateThumbnailsFastAsync(pdfFile.FullName, folderPath, stoppingToken);
+                //await GenerateThumbnailsAsync(pdfFile.FullName, folderPath, stoppingToken);
                 thumbWatch.Stop();
 
                 currentProcess.Refresh();
@@ -159,7 +161,7 @@ public class PdfProcessingBackgroundService : BackgroundService
         File.Move(tempFilePath, filePath);
     }
 
-    private async Task GenerateThumbnailsAsync(string filePath, string folderPath, CancellationToken stoppingToken)
+    private async Task GenerateThumbnailsFastAsync(string filePath, string folderPath, CancellationToken stoppingToken)
     {
         // Offload CPU-heavy image processing to a background thread
         await Task.Run(() =>
@@ -211,6 +213,80 @@ public class PdfProcessingBackgroundService : BackgroundService
             });
         }, stoppingToken);
     }
+
+    private async Task GenerateThumbnailsAsync(string filePath, string folderPath, CancellationToken stoppingToken)
+    {
+        // Offload CPU-heavy image processing to a background thread
+        await Task.Run(() =>
+        {
+            // If Ghostscript is bundled locally, tell Magick.NET where to find it.
+            var localGsPath = Path.Combine(AppContext.BaseDirectory, "ghostscript");
+            if (Directory.Exists(localGsPath))
+            {
+                MagickNET.SetGhostscriptDirectory(localGsPath);
+            }
+
+            // Get page count using PdfSharpCore to avoid loading all images into RAM at once
+            using var document = PdfReader.Open(filePath, PdfDocumentOpenMode.InformationOnly);
+            int pageCount = document.PageCount;
+
+            var parallelOptions = new ParallelOptions
+            {
+                // Limit the degree of parallelim to prevent OutOfMemory exceptions on massive PDFs
+                //MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2),
+
+                // Process pages sequentially to avoid overwhelming Ghostscript
+                MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 1),
+                CancellationToken = stoppingToken
+            };
+
+            Parallel.For(0, pageCount, parallelOptions, i =>
+            {
+                // Limit concurrent Ghostscript operations globally across all PDFs
+                GhostscriptSemaphore.Wait(stoppingToken);
+
+                try
+                {
+                    // Read only a single page at a time to handle 2800+ page PDFs safely
+                    var settings = new MagickReadSettings
+                    {
+                        Density = new Density(72),
+                        FrameIndex = (uint?)i,
+                        FrameCount = 1
+                    };
+
+                    using var images = new MagickImageCollection();
+                    images.Read(filePath, settings);
+
+                    if (images.Count > 0)
+                    {
+                        var image = images[0];
+                        // Replace transparent PDF backgrounds with white before converting to JPEG
+                        image.BackgroundColor = MagickColors.White;
+                        image.Alpha(AlphaOption.Remove);
+
+                        image.Format = MagickFormat.Jpeg;
+                        image.Resize(400, 0); // 400px width, keeping aspect ratio
+
+                        var thumbPath = Path.Combine(folderPath, $"thumbnail.{i + 1}.jpg");
+                        image.Write(thumbPath);
+                    }
+                }
+                catch (MagickDelegateErrorException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to generate thumbnail for page {PageNumber}. Skipping.", i + 1);
+                }
+                finally
+                {
+                    GhostscriptSemaphore.Release();
+                }
+
+
+            });
+        }, stoppingToken);
+    }
+
+
 
     private async Task ExtractPageMetadataAsync(string filePath, string folderPath, CancellationToken stoppingToken)
     {
