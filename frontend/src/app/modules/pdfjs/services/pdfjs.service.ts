@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-const PDFJS_WASM_URL = 'https://unpkg.com/pdfjs-dist@5.7.284/WASM/;
+const PDFJS_WASM_URL = 'https://unpkg.com/pdfjs-dist@5.7.284/WASM/';
 const PDFJS_WORKER_SRC = '/assets/pdf.worker.min.mjs';
 
 const NativePromise = (async () => {})().constructor as PromiseConstructor;
@@ -37,7 +37,7 @@ export class PdfjsService {
   constructor() {
     ensurePromisePolyfills();
 
-    // Use the real worker and provie wasm assets so JBIG2/CCITT images decode correctly.
+    // Use the real worker and provide wasm assets so JBIG2/CCITT images decode correctly.
     (pdfjsLib as any).GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
   }
 
@@ -63,7 +63,7 @@ export class PdfjsService {
     // await this.ensureFakeWorker();
     return pdfjsLib.getDocument({
       url,
-      wasmUrl: PDFJS_WASM_URL,    // Real wasm only
+      wasmUrl: PDFJS_WASM_URL, // Real wasm only
       disableStream: true,
       disableRange: true,
     }).promise;

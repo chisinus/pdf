@@ -32,8 +32,8 @@ public class PdfProcessingBackgroundService : BackgroundService
 
                 var currentProcess = Process.GetCurrentProcess();
                 var initialMemory = currentProcess.WorkingSet64;
-                long linearizationTimeMs = 0;
-                long linearizationMemoryChangeBytes = 0;
+                double linearizationTimeSec = 0;
+                double linearizationMemoryChangeMb = 0;
 
                 var isLinearized = await IsPdfLinearizedAsync(pdfFile.FullName, stoppingToken);
                 if (!isLinearized)
@@ -46,24 +46,25 @@ public class PdfProcessingBackgroundService : BackgroundService
 
                     linWatch.Stop();
                     currentProcess.Refresh();
-                    linearizationTimeMs = linWatch.ElapsedMilliseconds;
-                    linearizationMemoryChangeBytes = currentProcess.WorkingSet64 - preLinMemory;
+                    linearizationTimeSec = linWatch.Elapsed.TotalSeconds;
+                    linearizationMemoryChangeMb = (currentProcess.WorkingSet64 - preLinMemory) / (1024.0 * 1024.0);
 
-                    _logger.LogInformation("QPDF linearization complete in {ElapsedMilliseconds}ms. Memory change: {MemoryChange:N0} bytes.", linearizationTimeMs, linearizationMemoryChangeBytes);
+                    _logger.LogInformation("QPDF linearization complete in {ElapsedSeconds:F2}s. Memory change: {MemoryChange:F2} MB.", linearizationTimeSec, linearizationMemoryChangeMb);
                 }
 
                 _logger.LogInformation("Generating thumbnails...");
                 var thumbWatch = Stopwatch.StartNew();
                 var preThumbMemory = currentProcess.WorkingSet64;
 
-                //await PdfThumbnailService.GenerateThumbnailsFastAsync(pdfFile.FullName, folderPath, stoppingToken);
-                //await PdfThumbnailService.GenerateThumbnailsAsync(pdfFile.FullName, folderPath, __logger, stoppingToken);
+                //await PdfThumbnailService.GenerateThumbnailsGhostscriptFastAsync(pdfFile.FullName, folderPath, stoppingToken);
+                //await PdfThumbnailService.GenerateThumbnailsGhostscriptStableAsync(pdfFile.FullName, folderPath, _logger, stoppingToken);
                 await PdfThumbnailService.GenerateThumbnailsPdfiumViewerAsync(pdfFile.FullName, folderPath, 300, 300, 150, null, stoppingToken);
+
                 thumbWatch.Stop();
 
                 currentProcess.Refresh();
-                var thumbMemoryChangeBytes = currentProcess.WorkingSet64 - preThumbMemory;
-                _logger.LogInformation("Thumbnails generated in {ElapsedMilliseconds}ms. Memory change: {MemoryChange:N0} bytes.", thumbWatch.ElapsedMilliseconds, thumbMemoryChangeBytes);
+                var thumbMemoryChangeMb = (currentProcess.WorkingSet64 - preThumbMemory) / (1024.0 * 1024.0);
+                _logger.LogInformation("Thumbnails generated in {ElapsedSeconds:F2}s. Memory change: {MemoryChange:F2} MB.", thumbWatch.Elapsed.TotalSeconds, thumbMemoryChangeMb);
 
                 _logger.LogInformation("Extracting page metadata...");
                 var metaWatch = Stopwatch.StartNew();
@@ -72,8 +73,8 @@ public class PdfProcessingBackgroundService : BackgroundService
                 metaWatch.Stop();
 
                 currentProcess.Refresh();
-                var metaMemoryChangeBytes = currentProcess.WorkingSet64 - preMetaMemory;
-                _logger.LogInformation("Page metadata extracted in {ElapsedMilliseconds}ms. Memory change: {MemoryChange:N0} bytes.", metaWatch.ElapsedMilliseconds, metaMemoryChangeBytes);
+                var metaMemoryChangeMb = (currentProcess.WorkingSet64 - preMetaMemory) / (1024.0 * 1024.0);
+                _logger.LogInformation("Page metadata extracted in {ElapsedSeconds:F2}s. Memory change: {MemoryChange:F2} MB.", metaWatch.Elapsed.TotalSeconds, metaMemoryChangeMb);
 
                 // 4. Create document-level metadata
                 var metadataPath = Path.Combine(folderPath, "metadata.json");
@@ -82,7 +83,16 @@ public class PdfProcessingBackgroundService : BackgroundService
 
                 // 5. Save performance tracking data
                 var performancePath = Path.Combine(folderPath, "performance.json");
-                var performanceData = new { LinearizationTimeMs = linearizationTimeMs, LinearizationMemoryChangeBytes = linearizationMemoryChangeBytes, ThumbnailGenerationTimeMs = thumbWatch.ElapsedMilliseconds, ThumbnailMemoryChangeBytes = thumbMemoryChangeBytes, MetadataGenerationTimeMs = metaWatch.ElapsedMilliseconds, MetadataMemoryChangeBytes = metaMemoryChangeBytes, TotalMemoryChangeBytes = currentProcess.WorkingSet64 - initialMemory };
+                var performanceData = new
+                {
+                    LinearizationTimeSec = Math.Round(linearizationTimeSec, 2),
+                    LinearizationMemoryChangeMb = Math.Round(linearizationMemoryChangeMb, 2),
+                    ThumbnailGenerationTimeSec = Math.Round(thumbWatch.Elapsed.TotalSeconds, 2),
+                    ThumbnailMemoryChangeMb = Math.Round(thumbMemoryChangeMb, 2),
+                    MetadataGenerationTimeSec = Math.Round(metaWatch.Elapsed.TotalSeconds, 2),
+                    MetadataMemoryChangeMb = Math.Round(metaMemoryChangeMb, 2),
+                    TotalMemoryChangeMb = Math.Round((currentProcess.WorkingSet64 - initialMemory) / (1024.0 * 1024.0), 2)
+                };
                 await File.WriteAllTextAsync(performancePath, JsonSerializer.Serialize(performanceData), stoppingToken);
 
                 _logger.LogInformation("Successfully processed PDF in folder: {FolderPath}", folderPath);

@@ -1,13 +1,9 @@
 ﻿using ImageMagick;
 using PdfiumViewer;
 using PdfSharpCore.Pdf.IO;
-using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace PDFBackend.Services
 {
@@ -108,7 +104,7 @@ namespace PDFBackend.Services
         #region Ghostscript version
         private static readonly SemaphoreSlim GhostscriptSemaphore = new SemaphoreSlim(2, 2); // Max 2 concurrent Ghostscript operations
 
-        public static async Task GenerateThumbnailsFastAsync(string filePath, string folderPath, CancellationToken stoppingToken)
+        public static async Task GenerateThumbnailsGhostscriptFastAsync(string filePath, string folderPath, CancellationToken stoppingToken)
         {
             // Offload CPU-heavy image processing to a background thread
             await Task.Run(() =>
@@ -163,7 +159,7 @@ namespace PDFBackend.Services
             }, stoppingToken);
         }
 
-        public static async Task GenerateThumbnailsAsync(string filePath, string folderPath, ILogger logger,  CancellationToken stoppingToken)
+        public static async Task GenerateThumbnailsGhostscriptStableAsync(string filePath, string folderPath, ILogger logger,  CancellationToken stoppingToken)
         {
             // Offload CPU-heavy image processing to a background thread
             await Task.Run(() =>
