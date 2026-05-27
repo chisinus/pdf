@@ -35,12 +35,12 @@ namespace PDFBackend.Services
 
                 progress?.Report($"Rendering page {pageIndex + 1}/{pageCount}");
 
-                // Render page → bitmap
+                // Render page → image
                 using var pageImage = document.Render(
                     pageIndex,
                     dpi,
                     dpi,
-                    PdfRenderFlags.Annotations
+                    true // include annotations
                 );
 
                 // Downscale → thumbnail
@@ -54,6 +54,98 @@ namespace PDFBackend.Services
                 // Async file write
                 await SaveJpegAsync(thumb, fileName, 85, cancellationToken);
             }
+
+            progress?.Report("Thumbnail generation completed");
+        }
+
+        /// <summary>
+        /// Parallel version: processes multiple pages concurrently for better performance on complex PDFs.
+        /// Loads document ONCE and renders pages in parallel with a lock (PdfiumViewer is not fully thread-safe).
+        /// </summary>
+        public static async Task GenerateThumbnailsPdfiumViewerParallelAsync(
+            string pdfPath,
+            string outputFolder,
+            int thumbWidth = 300,
+            int thumbHeight = 300,
+            int dpi = 150,
+            IProgress<string>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (!File.Exists(pdfPath))
+                throw new FileNotFoundException("PDF not found", pdfPath);
+
+            Directory.CreateDirectory(outputFolder);
+
+            // Load document once and keep it open for all parallel renders
+            using var document = PdfDocument.Load(pdfPath);
+            int pageCount = document.PageCount;
+
+            progress?.Report($"Loaded PDF: {pageCount} pages");
+
+            // Lock around render operations (PdfiumViewer is not fully thread-safe)
+            var renderLock = new object();
+            // Save operations use GDI+ and are not fully thread-safe across threads.
+            // Serialize calls to Image.Save to avoid intermittent GDI+ ArgumentException.
+            var saveLock = new object();
+
+            // Use Parallel.For with CPU-count parallelism for rendering
+            var parallelOptions = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2),
+                //MaxDegreeOfParallelism = 1,
+                CancellationToken = cancellationToken
+            };
+
+            await Task.Run(() =>
+            {
+                Parallel.For(0, pageCount, parallelOptions, pageIndex =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    progress?.Report($"Rendering page {pageIndex + 1}/{pageCount}");
+
+                    // Render page → image (locked to ensure thread-safety)
+                    Image pageImage;
+                    lock (renderLock)
+                    {
+                        // Parallel.For may call the Action<long> overload, so cast to int
+                        pageImage = document.Render(
+                            (int)pageIndex,
+                            dpi,
+                            dpi,
+                            true // include annotations
+                        );
+                    }
+
+                    // Thumbnail creation and JPEG encoding can run in parallel (outside lock)
+                    using (pageImage)
+                    {
+                        using var thumb = CreateThumbnail(pageImage, thumbWidth, thumbHeight);
+
+                        if (thumb == null)
+                            throw new InvalidOperationException("CreateThumbnail returned null.");
+
+                        if (thumb.Width <= 0 || thumb.Height <= 0)
+                            throw new InvalidOperationException($"Invalid thumbnail dimensions: {thumb.Width}x{thumb.Height}");
+
+                        string fileName = Path.Combine(outputFolder, $"thumbnail.{pageIndex + 1}.jpg");
+
+                        var encoder = ImageCodecInfo.GetImageEncoders()
+                            .FirstOrDefault(c => c.FormatID == ImageFormat.Jpeg.Guid);
+
+                        if (encoder == null)
+                            throw new InvalidOperationException("JPEG encoder not found.");
+
+                        using var encoderParams = new EncoderParameters(1);
+                        encoderParams.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 85L);
+
+                        lock (saveLock)
+                        {
+                            thumb.Save(fileName, encoder, encoderParams);
+                        }
+                    }
+                });
+            }, cancellationToken);
 
             progress?.Report("Thumbnail generation completed");
         }
