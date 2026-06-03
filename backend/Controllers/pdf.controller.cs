@@ -152,9 +152,41 @@ public class PdfController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetThumbnail(string id, int page)
     {
+        System.Console.WriteLine($"Requesting thumbnail for ID: {id}, Page: {page}");
         var thumbPath = Path.Combine(_uploadFolder, id, $"thumbnail.{page}.jpg");
         if (!System.IO.File.Exists(thumbPath)) return NotFound();
 
+        var aa = PhysicalFile(thumbPath, "image/jpeg");
+
         return PhysicalFile(thumbPath, "image/jpeg");
+    }
+
+    [HttpGet("api/thumbnails/range/{id}/{start}/{end}")]
+    public IActionResult GetThumbnailRange(string id, int start, int end)
+    {
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var results = new List<object>();
+
+        for (int page = start; page <= end; page++)
+        {
+            var thumbPath = Path.Combine(_uploadFolder, id, $"thumbnail.{page}.jpg");
+
+            if (System.IO.File.Exists(thumbPath))
+            {
+                results.Add(new
+                {
+                    page,
+                    url = $"{baseUrl}/api/thumbnails/{id}/{page}"
+                });
+            }
+        }
+
+        return Ok(new
+        {
+            id,
+            start,
+            end,
+            thumbnails = results
+        });
     }
 }

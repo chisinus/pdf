@@ -21,4 +21,9 @@ export class FileService {
   deleteFile(id: string): Observable<any> {
     return this.http.delete(`${this.api}/delete/${id}`);
   }
+
+  getThumbnailRange(documentId: string, start: number, end: number) {
+    console.log('>>>>>>>>>>>>>> getThumbnailRange', documentId, start, end);');
+    return this.http.get<any>(`http://localhost:4001/api/thumbnails/${documentId}/${start}/${end}`);
+  }
 }

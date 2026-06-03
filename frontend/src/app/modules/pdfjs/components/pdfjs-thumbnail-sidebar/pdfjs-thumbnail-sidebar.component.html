@@ -1,5 +1,9 @@
 <div class="sidebar-container">
-  <cdk-virtual-scroll-viewport itemSize="200" class="scroll-viewport">
+  <cdk-virtual-scroll-viewport
+    itemSize="200"
+    class="scroll-viewport"
+    (scrolledIndexChange)="onScrolledIndexChange($event)"
+  >
     <div
       *cdkVirtualFor="let page of pages"
       class="thumbnail-container"
@@ -7,8 +11,9 @@
       (click)="selectPage(page)"
     >
       <div class="page-label">Page {{ page }}</div>
+
       <img
-        [src]="'http://localhost:4001/api/thumbnails/' + documentId + '/' + page"
+        [src]="thumbnailUrls[page]"
         alt="Page {{ page }}"
         class="thumbnail-image"
         (error)="handleImageError($event)"
