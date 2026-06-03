@@ -7,9 +7,11 @@ import {
   Output,
   SimpleChanges,
   ViewChild,
+  DestroyRef,
 } from '@angular/core';
 import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
 import { FileService } from '../../../../services/file.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-pdfjs-thumbnail-sidebar',
@@ -29,7 +31,10 @@ export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
   @ViewChild(CdkVirtualScrollViewport) viewport!: CdkVirtualScrollViewport;
   private suppressNextScroll = false;
 
-  constructor(private fileService: FileService) {}
+  constructor(
+    private fileService: FileService,
+    private destroyRef: DestroyRef
+  ) {}
 
   ngOnInit() {
     this.loadBatch(1);
@@ -65,28 +70,29 @@ export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
 
   // Load thumbnails in batches to avoid overwhelming the server with requests.
   thumbnailUrls: { [page: number]: string } = {};
-  batchSize = 50;
+  requestedBatches = new Set<number>();
+  batchSize = 20;
 
   loadBatch(startPage: number) {
-    console.log('>>>>>>>>>>>>>> loadBatch', startPage);
+    if (this.requestedBatches.has(startPage)) return;
+    this.requestedBatches.add(startPage);
+
     const endPage = startPage + this.batchSize - 1;
 
-    this.fileService.getThumbnailRange(this.documentId, startPage, endPage).subscribe((result) => {
+    this.fileService.getThumbnailRange(this.documentId, startPage, endPage).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((result) => {
       for (const item of result.thumbnails) {
         this.thumbnailUrls[item.page] = item.url;
       }
     });
-
-    console.log('>>>>>>>>>>>>>> loadBatch end', startPage, endPage, this.thumbnailUrls);
   }
 
   onScrolledIndexChange(index: number) {
-    console.log('>>>>>>>>>>>>>> onScrolledIndexChange', index);
     const page = this.pages[index];
+    const url = this.thumbnailUrls[page];
 
-    // If near the end of loaded thumbnails, load next batch
-    if (page % this.batchSize === 0) {
-      this.loadBatch(page + 1);
+    if (!url) {
+      const startPage = Math.floor((page - 1) / this.batchSize) * this.batchSize + 1;
+      this.loadBatch(startPage);
     }
   }
 }

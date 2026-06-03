@@ -150,35 +150,74 @@ public class PdfController : ControllerBase
     [HttpGet("thumbnails/{id}/{page}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public IActionResult GetThumbnail(string id, int page)
+    public async Task<IActionResult> GetThumbnail(string id, int page)
     {
-        System.Console.WriteLine($"Requesting thumbnail for ID: {id}, Page: {page}");
-        var thumbPath = Path.Combine(_uploadFolder, id, $"thumbnail.{page}.jpg");
-        if (!System.IO.File.Exists(thumbPath)) return NotFound();
+        var folderPath = Path.Combine(_uploadFolder, id);
+        if (!Directory.Exists(folderPath))
+            return NotFound(new { Message = "File not found." });
 
-        var aa = PhysicalFile(thumbPath, "image/jpeg");
+        try
+        {
+            await EnsureThumbnailsExistAsync(folderPath, new List<int> { page });
 
-        return PhysicalFile(thumbPath, "image/jpeg");
+            var thumbPath = Path.Combine(folderPath, $"thumbnail.{page}.jpg");
+            if (System.IO.File.Exists(thumbPath))
+            {
+                return PhysicalFile(thumbPath, "image/jpeg");
+            }
+            
+            return NotFound(new { Message = "Thumbnail not found after generation attempt." });
+        }
+        catch (OperationCanceledException)
+        {
+            return StatusCode(499, new { Message = "Request cancelled." });
+        }
+        catch (FileNotFoundException ex)
+        {
+            return NotFound(new { Message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Error generating thumbnail.", Detail = ex.Message });
+        }
     }
 
-    [HttpGet("api/thumbnails/range/{id}/{start}/{end}")]
-    public IActionResult GetThumbnailRange(string id, int start, int end)
+    [HttpGet("thumbnails/range/{id}/{start}/{end}")]
+    public async Task<IActionResult> GetThumbnailRange(string id, int start, int end)
     {
         var baseUrl = $"{Request.Scheme}://{Request.Host}";
         var results = new List<object>();
+        var folderPath = Path.Combine(_uploadFolder, id);
 
-        for (int page = start; page <= end; page++)
+        if (!Directory.Exists(folderPath))
+            return NotFound(new { Message = "File not found." });
+
+        var pagesToCheck = Enumerable.Range(start, end - start + 1).ToList();
+
+        try
         {
-            var thumbPath = Path.Combine(_uploadFolder, id, $"thumbnail.{page}.jpg");
+            await EnsureThumbnailsExistAsync(folderPath, pagesToCheck);
 
-            if (System.IO.File.Exists(thumbPath))
+            foreach (var page in pagesToCheck)
             {
-                results.Add(new
+                var thumbPath = Path.Combine(folderPath, $"thumbnail.{page}.jpg");
+                if (System.IO.File.Exists(thumbPath))
                 {
-                    page,
-                    url = $"{baseUrl}/api/thumbnails/{id}/{page}"
-                });
+                    results.Add(new { page, url = $"{baseUrl}/uploads/{id}/thumbnail.{page}.jpg" });
+                }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            return StatusCode(499, new { Message = "Request cancelled." });
+        }
+        catch (FileNotFoundException ex)
+        {
+            return NotFound(new { Message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Error generating thumbnails.", Detail = ex.Message });
         }
 
         return Ok(new
@@ -188,5 +227,32 @@ public class PdfController : ControllerBase
             end,
             thumbnails = results
         });
+    }
+
+    private async Task EnsureThumbnailsExistAsync(string folderPath, List<int> pagesToCheck)
+    {
+        var missingPages = pagesToCheck
+            .Where(p => !System.IO.File.Exists(Path.Combine(folderPath, $"thumbnail.{p}.jpg")))
+            .ToList();
+
+        if (missingPages.Count == 0) return;
+
+        var pdfFile = new DirectoryInfo(folderPath)
+            .GetFiles("*.pdf")
+            .FirstOrDefault(f => !IsTemporaryPdf(f));
+
+        if (pdfFile == null)
+            throw new FileNotFoundException("PDF not found.");
+
+        await PdfThumbnailService.GenerateThumbnailsPdfiumViewerParallelAsync(
+            pdfFile.FullName,
+            folderPath,
+            thumbWidth: 300,
+            thumbHeight: 300,
+            dpi: 150,
+            progress: null,
+            cancellationToken: HttpContext.RequestAborted,
+            pageList: missingPages
+        );
     }
 }

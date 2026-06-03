@@ -1,5 +1,6 @@
 ﻿using ImageMagick;
 using PdfiumViewer;
+using System.Linq;
 using PdfSharpCore.Pdf.IO;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -69,7 +70,8 @@ namespace PDFBackend.Services
             int thumbHeight = 300,
             int dpi = 150,
             IProgress<string>? progress = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            IReadOnlyList<int>? pageList = null)
         {
             if (!File.Exists(pdfPath))
                 throw new FileNotFoundException("PDF not found", pdfPath);
@@ -98,7 +100,28 @@ namespace PDFBackend.Services
 
             await Task.Run(() =>
             {
-                Parallel.For(0, pageCount, parallelOptions, pageIndex =>
+                // Determine which zero-based page indices to process
+                IEnumerable<int> indices;
+                if (pageList == null || pageList.Count == 0)
+                {
+                    indices = Enumerable.Range(0, pageCount);
+                }
+                else
+                {
+                    // Convert 1-based page numbers to 0-based indices and filter invalid values
+                    indices = pageList
+                        .Where(p => p >= 1)
+                        .Select(p => p - 1)
+                        .Distinct()
+                        .Where(i => i >= 0 && i < pageCount)
+                        .ToArray();
+                }
+
+                // If there are no pages to process, just return
+                if (!indices.Any())
+                    return;
+
+                Parallel.ForEach(indices, parallelOptions, pageIndex =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
@@ -108,9 +131,8 @@ namespace PDFBackend.Services
                     Image pageImage;
                     lock (renderLock)
                     {
-                        // Parallel.For may call the Action<long> overload, so cast to int
                         pageImage = document.Render(
-                            (int)pageIndex,
+                            pageIndex,
                             dpi,
                             dpi,
                             true // include annotations

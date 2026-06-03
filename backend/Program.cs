@@ -1,5 +1,6 @@
 using PDFBackend.Services;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +50,19 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowAngularDev");
+
+// Ensure uploads directory exists for static file serving
+var uploadFolder = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
+if (!Directory.Exists(uploadFolder))
+{
+    Directory.CreateDirectory(uploadFolder);
+}
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadFolder),
+    RequestPath = "/uploads"
+});
 
 app.UseAuthorization();
 app.MapControllers();
