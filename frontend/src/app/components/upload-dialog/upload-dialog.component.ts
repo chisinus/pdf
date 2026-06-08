@@ -4,7 +4,7 @@ import { FileService } from '../../services/file.service';
 @Component({
   selector: 'app-upload-dialog',
   templateUrl: './upload-dialog.component.html',
-  styleUrls: ['./upload-dialog.component.scss'],
+  styleUrls: ['./upload-dialog.component.css'],
   standalone: true,
 })
 export class UploadDialogComponent {

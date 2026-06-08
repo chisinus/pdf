@@ -1,11 +1,11 @@
 import { Component, OnInit } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
-import { UploadDialogComponent } from '../../upload-dialog/upload-dialog.component';
 import { PdfViewerComponent } from '../../modules/simple/pdf-viewer/pdf-viewer.component';
 import { PdfjsViewerComponent as PdfJsViewerComponent } from '../../modules/pdfjs/components/pdfjs-viewer/pdfjs-viewer.component';
 import { FileService } from '../../services/file.service';
 import { FileInfo } from '../../models/file-info.interface';
+import { UploadDialogComponent } from '../upload-dialog/upload-dialog.component';
 
 @UntilDestroy()
 @Component({

@@ -9,15 +9,14 @@
   >
     @if (!file) {
       <p>Drag a file here or browse</p>
-    } @else {
+    }
+    @if (file) {
       <p>Selected: {{ selectedFileName }}</p>
     }
     <input type="file" (change)="onFileSelected($event)" />
   </div>
   <div style="margin-top: 12px">
-    <button class="button" (click)="upload()" [disabled]="!file || uploading">
-      Upload
-    </button>
+    <button class="button" (click)="upload()" [disabled]="!file || uploading">Upload</button>
     <button class="button" (click)="cancel()">Cancel</button>
   </div>
 </div>

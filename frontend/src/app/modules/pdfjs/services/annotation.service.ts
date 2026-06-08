@@ -1,14 +1,13 @@
 import { Injectable } from '@angular/core';
-
-export type Tool = 'pen' | 'rect' | 'arrow' | 'text' | 'highlight' | null;
+import { AnnotationType } from '../../../models/enum';
 
 @Injectable({ providedIn: 'root' })
 export class AnnotationService {
-  currentTool: Tool = null;
+  currentTool: AnnotationType | null= null;
   strokeColor = '#ff0000';
   strokeWidth = 2;
 
-  setTool(tool: Tool) {
+  setTool(tool: AnnotationType) {
     this.currentTool = tool;
   }
 }

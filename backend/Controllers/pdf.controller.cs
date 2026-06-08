@@ -135,16 +135,58 @@ public class PdfController : ControllerBase
         return PhysicalFile(pdfFile.FullName, "application/pdf", enableRangeProcessing: true);
     }
 
-    [HttpGet("metadata/{id}")]
+    [HttpGet("pagesmetadata/{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public IActionResult GetMetadata(string id)
+    public IActionResult GetPagesMetadata(string id)
     {
         var metadataPath = Path.Combine(_uploadFolder, id, "pages-metadata.json");
         if (!System.IO.File.Exists(metadataPath)) return NotFound(new { Message = "Metadata not found or still processing." });
 
         var json = System.IO.File.ReadAllText(metadataPath);
         return Content(json, "application/json");
+    }
+
+    [HttpPost("annotations/{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SaveAnnotations(string id, [FromBody] List<PDFBackend.Models.AnnotationBase> annotations)
+    {
+        var folderPath = Path.Combine(_uploadFolder, id);
+        if (!Directory.Exists(folderPath)) return NotFound(new { Message = "File not found." });
+
+        var metadataPath = Path.Combine(folderPath, "pages-metadata.json");
+        if (!System.IO.File.Exists(metadataPath)) return NotFound(new { Message = "Metadata not found." });
+
+        try
+        {
+            var json = await System.IO.File.ReadAllTextAsync(metadataPath);
+            var options = new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true, 
+                IncludeFields = true // Important: PageMetadata uses fields instead of properties
+            };
+            
+            var pageMetadataList = JsonSerializer.Deserialize<List<PDFBackend.Models.PageMetadata>>(json, options) 
+                                   ?? new List<PDFBackend.Models.PageMetadata>();
+
+            var annotationsByPage = annotations.GroupBy(a => a.Page).ToDictionary(g => g.Key, g => g.ToArray());
+
+            foreach (var pageMeta in pageMetadataList)
+            {
+                annotationsByPage.TryGetValue(pageMeta.PageNumber, out var pageAnnotations);
+                pageMeta.Annotations = pageAnnotations; // Automatically clears annotations if none exist for this page
+            }
+
+            var updatedJson = JsonSerializer.Serialize(pageMetadataList, new JsonSerializerOptions { WriteIndented = true, IncludeFields = true });
+            await System.IO.File.WriteAllTextAsync(metadataPath, updatedJson);
+
+            return Ok(new { Message = "Annotations saved successfully." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Error saving annotations.", Detail = ex.Message });
+        }
     }
 
     [HttpGet("thumbnails/{id}/{page}")]

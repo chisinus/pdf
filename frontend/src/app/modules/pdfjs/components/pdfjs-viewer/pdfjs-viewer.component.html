@@ -1,11 +1,11 @@
 <div class="viewer-layout">
   <aside class="activity-bar">
     <div class="toolbar-title">Tools</div>
-    <button (click)="setTool('pen')">Pen</button>
-    <button (click)="setTool('rect')">Rectangle</button>
-    <button (click)="setTool('arrow')">Arrow</button>
-    <button (click)="setTool('text')">Text</button>
-    <button (click)="setTool(null)">Select</button>
+    <button (click)="setTool(AnnotationType.Arrow)">Arrow</button>
+    <button (click)="setTool(AnnotationType.Freehand)">Pen</button>
+    <button (click)="setTool(AnnotationType.Rectangle)">Rectangle</button>
+    <button (click)="setTool(AnnotationType.Highlight)">Highlight</button>
+    <button (click)="save()">Save Annotations</button>
   </aside>
 
   <section class="viewer-main" #scrollContainer>
