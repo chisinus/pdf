@@ -3,11 +3,15 @@ import {
   EventEmitter,
   Input,
   OnChanges,
+  OnInit,
   Output,
   SimpleChanges,
   ViewChild,
+  DestroyRef,
 } from '@angular/core';
 import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
+import { FileService } from '../../../../services/file.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-pdfjs-thumbnail-sidebar',
@@ -16,7 +20,7 @@ import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrollin
   standalone: true,
   imports: [ScrollingModule],
 })
-export class PdfjsThumbnailSidebarComponent implements OnChanges {
+export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
   @Input() documentId!: string;
   @Input() pageCount: number = 0;
   @Input() activePage: number = 1;
@@ -26,6 +30,15 @@ export class PdfjsThumbnailSidebarComponent implements OnChanges {
 
   @ViewChild(CdkVirtualScrollViewport) viewport!: CdkVirtualScrollViewport;
   private suppressNextScroll = false;
+
+  constructor(
+    private fileService: FileService,
+    private destroyRef: DestroyRef
+  ) {}
+
+  ngOnInit() {
+    this.loadBatch(1);
+  }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['pageCount'] && this.pageCount > 0) {
@@ -53,5 +66,33 @@ export class PdfjsThumbnailSidebarComponent implements OnChanges {
     // top — let it remain visually where the user clicked.
     this.suppressNextScroll = true;
     this.pageSelected.emit(page);
+  }
+
+  // Load thumbnails in batches to avoid overwhelming the server with requests.
+  thumbnailUrls: { [page: number]: string } = {};
+  requestedBatches = new Set<number>();
+  batchSize = 20;
+
+  loadBatch(startPage: number) {
+    if (this.requestedBatches.has(startPage)) return;
+    this.requestedBatches.add(startPage);
+
+    const endPage = startPage + this.batchSize - 1;
+
+    this.fileService.getThumbnailRange(this.documentId, startPage, endPage).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((result) => {
+      for (const item of result.thumbnails) {
+        this.thumbnailUrls[item.page] = item.url;
+      }
+    });
+  }
+
+  onScrolledIndexChange(index: number) {
+    const page = this.pages[index];
+    const url = this.thumbnailUrls[page];
+
+    if (!url) {
+      const startPage = Math.floor((page - 1) / this.batchSize) * this.batchSize + 1;
+      this.loadBatch(startPage);
+    }
   }
 }
