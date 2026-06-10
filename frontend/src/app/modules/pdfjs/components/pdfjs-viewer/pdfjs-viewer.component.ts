@@ -76,7 +76,8 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
     }
 
     this.ngZone.runOutsideAngular(async () => {
-      const url = `http://localhost:4001/api/download/${this.documentId}`;
+      // Append a timestamp to the URL to bypass browser cache
+      const url = `http://localhost:4001/api/download/${this.documentId}?t=${new Date().getTime()}`;
 
       const pdf = await this.pdfjsService.loadDocument(url);
       this.pdfDoc = pdf;

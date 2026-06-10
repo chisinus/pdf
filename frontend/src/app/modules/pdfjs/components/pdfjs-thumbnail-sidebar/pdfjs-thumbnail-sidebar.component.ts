@@ -37,7 +37,9 @@ export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
   ) {}
 
   ngOnInit() {
-    this.loadBatch(1);
+    // this.loadBatch(1);
+    
+    this.downloadThumbnailsZip();
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -93,6 +95,13 @@ export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
     if (!url) {
       const startPage = Math.floor((page - 1) / this.batchSize) * this.batchSize + 1;
       this.loadBatch(startPage);
+    }
+  }
+
+  async downloadThumbnailsZip() {
+    const thumbnails = await this.fileService.getThumbnailRangeZip(this.documentId, 1, this.pageCount);
+    for (const item of thumbnails) {
+      this.thumbnailUrls[item.page] = item.url;
     }
   }
 }

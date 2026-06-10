@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { FileInfo } from '../models/file-info.interface';
 import { AnnotationBase } from '../models/annotation.interface';
+import JSZip from 'jszip';
 
 @Injectable({ providedIn: 'root' })
 export class FileService {
@@ -33,5 +34,64 @@ export class FileService {
 
   getPagesMetadata(documentId: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.api}/pagesmetadata/${documentId}`);
+  }
+
+  applyAnnotationsToPdf(documentId: string): Observable<any> {
+    return this.http.post(`${this.api}/annotations/apply/${documentId}`, {});
+  }
+
+  getThumbnailsZip(documentId: string): Observable<Blob> {
+    return this.http.get(`${this.api}/pdf/thumbnails/zip/${documentId}`, {
+      responseType: 'blob'
+    });
+  }
+
+  async getThumbnailRangeZip(documentId: string, start: number, end: number): Promise<any[]> {
+    console.log('>>>>>>>>>>>>>xj fetching thumbnails zip for document', documentId, 'pages', start, 'to', end);
+    const url = `${this.api}/pdf/thumbnails/rangezip/${documentId}/${start}/${end}`;
+    console.log('>>>>>>>>>>>>>xj downloading thumbnails zip from', url);
+
+    // 1. Download ZIP as ArrayBuffer
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to download ZIP: ${response.status}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+
+    // 2. Load ZIP
+    const zip = await JSZip.loadAsync(arrayBuffer);
+
+    // 3. Parse manifest.json
+    const manifestFile = zip.file("manifest.json");
+    if (!manifestFile) {
+      throw new Error("manifest.json missing in ZIP");
+    }
+
+    const manifestText = await manifestFile.async("string");
+    const manifest = JSON.parse(manifestText);
+
+    // 4. Extract thumbnails
+    const thumbnails = [];
+
+    for (const item of manifest) {
+      const fileName = item.file;
+      const file = zip.file(fileName);
+      if (!file) continue;
+
+      const blob = await file.async("blob");
+      const blobUrl = URL.createObjectURL(blob);
+
+      thumbnails.push({
+        page: Number(item.page),
+        url: blobUrl,
+        size: item.size
+      });
+    }
+
+    // 5. Sort by page number
+    thumbnails.sort((a, b) => a.page - b.page);
+
+    return thumbnails;    
   }
 }

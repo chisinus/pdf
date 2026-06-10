@@ -21,8 +21,9 @@
               <td>{{ f.thumbnails }}</td>
               <td>
                 <button class="button" (click)="deleteFile(f.uniqueName)">Delete</button>
-                <button class="button" (click)="openFile(f)">Open</button>
+                <!-- <button class="button" (click)="openFile(f)">Open</button> -->
                 <button class="button" (click)="openWithPdfJs(f)">Open with PDFJs</button>
+                <button class="button" (click)="updatePdfAnnotations(f)">Update Anno</button>
               </td>
             </tr>
           }

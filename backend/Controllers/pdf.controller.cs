@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using PDFBackend.Services;
 using System.Runtime;
 using System.Text.Json;
-using FileInfo = PDFBackend.Models.FileInfo;
+using PdfSharpCore.Drawing;
+using PdfSharpCore.Pdf.IO;
+using System.IO.Compression;
 
 namespace PDFBackend.Controllers;
 
@@ -296,5 +298,190 @@ public class PdfController : ControllerBase
             cancellationToken: HttpContext.RequestAborted,
             pageList: missingPages
         );
+    }
+
+    [HttpPost("annotations/apply/{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ApplyAnnotations(string id)
+    {
+        var folderPath = Path.Combine(_uploadFolder, id);
+        if (!Directory.Exists(folderPath)) return NotFound(new { Message = "File not found." });
+
+        var pdfFile = new DirectoryInfo(folderPath).GetFiles("*.pdf").FirstOrDefault(f => !IsTemporaryPdf(f));
+        if (pdfFile == null) return NotFound(new { Message = "PDF not found." });
+
+        var metadataPath = Path.Combine(folderPath, "pages-metadata.json");
+        if (!System.IO.File.Exists(metadataPath)) return NotFound(new { Message = "Metadata not found." });
+
+        try
+        {
+            var json = await System.IO.File.ReadAllTextAsync(metadataPath);
+            var options = new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true, 
+                IncludeFields = true 
+            };
+            
+            var pageMetadataList = JsonSerializer.Deserialize<List<PDFBackend.Models.PageMetadata>>(json, options) 
+                                   ?? new List<PDFBackend.Models.PageMetadata>();
+
+            bool pdfModified = false;
+            double scale = 1.0 / 1.5; // Frontend drawn at 1.5x scale viewport, converting back to native PDF points
+
+            using (var document = PdfReader.Open(pdfFile.FullName, PdfDocumentOpenMode.Modify))
+            {
+                foreach (var meta in pageMetadataList)
+                {
+                    if (meta.Annotations != null && meta.Annotations.Any())
+                    {
+                        var page = document.Pages[meta.PageNumber - 1];
+                        using (var gfx = XGraphics.FromPdfPage(page))
+                        {
+                            foreach (var ann in meta.Annotations)
+                            {
+                                if (ann is PDFBackend.Models.AnnotationRectangle rect)
+                                {
+                                    var pen = new XPen(ParseColor(rect.Color), 2 * scale);
+                                    gfx.DrawRectangle(pen, rect.Position.X * scale, rect.Position.Y * scale, rect.Width * scale, rect.Height * scale);
+                                }
+                                //else if (ann is PDFBackend.Models.AnnotationHighlight highlight)
+                                //{
+                                //    var brush = new XSolidBrush(ParseColor(highlight.Color, highlight.Opacity));
+                                //    gfx.DrawRectangle(brush, highlight.Position.X * scale, highlight.Position.Y * scale, highlight.Width * scale, highlight.Height * scale);
+                                //}
+                                else if (ann is PDFBackend.Models.AnnotationFreehand freehand)
+                                {
+                                    if (freehand.Points != null && freehand.Points.Count > 1)
+                                    {
+                                        var pen = new XPen(ParseColor(freehand.Color), freehand.StrokeWidth * scale);
+                                        var points = freehand.Points.Select(p => new XPoint(p.X * scale, p.Y * scale)).ToArray();
+                                        gfx.DrawLines(pen, points);
+                                    }
+                                }
+                                else if (ann is PDFBackend.Models.AnnotationArrow arrow)
+                                {
+                                    var pen = new XPen(ParseColor(arrow.Color), arrow.StrokeWidth * scale);
+                                double x1 = arrow.Position.X * scale;
+                                double y1 = arrow.Position.Y * scale;
+                                double x2 = arrow.EndPosition.X * scale;
+                                double y2 = arrow.EndPosition.Y * scale;
+                                gfx.DrawLine(pen, x1, y1, x2, y2);
+
+                                double headLength = 10 * scale;
+                                double dx = x2 - x1;
+                                double dy = y2 - y1;
+                                double angle = Math.Atan2(dy, dx);
+                                gfx.DrawLine(pen, x2, y2, x2 - headLength * Math.Cos(angle - Math.PI / 6), y2 - headLength * Math.Sin(angle - Math.PI / 6));
+                                gfx.DrawLine(pen, x2, y2, x2 - headLength * Math.Cos(angle + Math.PI / 6), y2 - headLength * Math.Sin(angle + Math.PI / 6));
+                                }
+                            }
+                        }
+                        meta.Annotations = null; // Clear annotations from metadata
+                        pdfModified = true;
+                    }
+                }
+
+                if (pdfModified)
+                {
+                    document.Save(pdfFile.FullName);
+                }
+            }
+
+            if (pdfModified)
+            {
+                var updatedJson = JsonSerializer.Serialize(pageMetadataList, new JsonSerializerOptions { WriteIndented = true, IncludeFields = true });
+                await System.IO.File.WriteAllTextAsync(metadataPath, updatedJson);
+            }
+
+            return Ok(new { Message = "Annotations applied to PDF and removed from metadata." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Error applying annotations.", Detail = ex.Message });
+        }
+    }
+
+    private XColor ParseColor(string colorHex, double opacity = 1.0)
+    {
+        try
+        {
+            var c = System.Drawing.ColorTranslator.FromHtml(colorHex);
+            return XColor.FromArgb((int)(opacity * 255), c.R, c.G, c.B);
+        }
+        catch
+        {
+            return XColor.FromArgb((int)(opacity * 255), 255, 0, 0); // Fallback to red
+        }
+    }
+
+    [HttpGet("pdf/thumbnails/rangezip/{id}/{start}/{end}")]
+    public async Task<IActionResult> GetThumbnailRangeZip(
+        string id,
+        int start,
+        int end)
+    {
+        if (start < 1 || end < start)
+            return BadRequest("Invalid page range.");
+
+        string thumbFolder = Path.Combine(_uploadFolder, id);
+        if (!Directory.Exists(thumbFolder))
+            return NotFound("Thumbnail folder not found.");
+
+        string cacheFolder = Path.Combine(Directory.GetCurrentDirectory(), "cache", id);
+        Directory.CreateDirectory(cacheFolder);
+
+        string zipName = $"thumbnails_{start}_{end}.zip";
+        string zipPath = Path.Combine(cacheFolder, zipName);
+
+        // If cached ZIP exists, stream it immediately
+        if (System.IO.File.Exists(zipPath))
+        {
+            return PhysicalFile(zipPath, "application/zip", zipName);
+        }
+
+        // Otherwise, create the ZIP and cache it
+        using (var zipStream = System.IO.File.Create(zipPath))
+        using (var zip = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: false))
+        {
+            var manifest = new List<object>();
+
+            for (int page = start; page <= end; page++)
+            {
+                string filePath = Path.Combine(thumbFolder, $"thumbnail.{page}.jpg");
+                if (!System.IO.File.Exists(filePath))
+                    continue; // skip missing thumbnails
+
+                var entry = zip.CreateEntry($"thumbnail.{page}.jpg", CompressionLevel.Fastest);
+
+                using (var entryStream = entry.Open())
+                using (var fileStream = System.IO.File.OpenRead(filePath))
+                {
+                    await fileStream.CopyToAsync(entryStream);
+                }
+
+                manifest.Add(new
+                {
+                    page,
+                    file = $"thumbnail.{page}.jpg",
+                    size = new FileInfo(filePath).Length
+                });
+            }
+
+            // Add manifest.json
+            var manifestEntry = zip.CreateEntry("manifest.json", CompressionLevel.Fastest);
+            using (var manifestStream = manifestEntry.Open())
+            using (var writer = new StreamWriter(manifestStream))
+            {
+                var json = JsonSerializer.Serialize(manifest, new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+                await writer.WriteAsync(json);
+            }
+        }
+
+        // Now stream the cached ZIP
+        return PhysicalFile(zipPath, "application/zip", zipName);
     }
 }

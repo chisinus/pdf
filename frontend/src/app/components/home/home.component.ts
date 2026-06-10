@@ -67,4 +67,17 @@ export class HomeComponent implements OnInit {
     this.showUpload = false;
     if (success) this.loadFiles();
   }
+
+  updatePdfAnnotations(f: FileInfo) {
+    this.fileService.applyAnnotationsToPdf(f.uniqueName).subscribe({
+      next: (res) => {
+        console.log('Annotations successfully burned into PDF', res);
+        alert('Annotations successfully applied to PDF!');
+      },
+      error: (err) => {
+        console.error('Failed to apply annotations', err);
+        alert('Failed to apply annotations. Please try again.');
+      }
+    });
+  }
 }
