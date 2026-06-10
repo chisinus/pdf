@@ -28,6 +28,9 @@ builder.Services.AddSwaggerGen();
 // Register the background queue and the hosted background service
 builder.Services.AddSingleton<PdfProcessingQueue>();
 builder.Services.AddHostedService<PdfProcessingBackgroundService>();
+builder.Services.AddScoped<IPdfDocumentService, PdfDocumentService>();
+builder.Services.AddScoped<IPdfAnnotationService, PdfAnnotationService>();
+builder.Services.AddScoped<IPdfThumbnailManagerService, PdfThumbnailManagerService>();
 
 // Add CORS configuration
 builder.Services.AddCors(options =>
