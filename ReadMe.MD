@@ -831,3 +831,19 @@ Avoid these patterns:
 Build the browser as a fast virtualized viewer/editor of document state, and build the server as the owner of heavy PDF processing and final file generation.
 pdf_readme.md
 Displaying pdf_readme.md.
+
+
+# 18. Load Thumbnail performance
+
+The Architecture: “Lazy Generation + Background Worker + Cached ZIPs”
+
+- [ ] use a background job to generate all thumbnails
+- [ ] keep the "generate on demand" logic
+- [ ] create a zip file that will hold all thumbnails eventually
+- [ ] if a thumbnail is not in zip file, create it, then add it
+- [ ] another thought: create a zip file in the folder, with 0 thumbnail urls to start
+  - [ ] the background job continue to generate thumbnails, and update the zip file in batches
+  - [ ] instead of pass "start" and "end" to get range, client passes a list of page numbers to Web API
+  - [ ] "get range" Web API does not update the zip file
+  - [ ] background job review and update the zip file after it processes all thumbnails. (to avoid concurrency issues)
+

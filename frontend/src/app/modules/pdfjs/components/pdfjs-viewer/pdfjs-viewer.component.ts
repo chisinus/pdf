@@ -12,6 +12,9 @@ import {
 import { PdfjsService } from '../../services/pdfjs.service';
 import { AnnotationService } from '../../services/annotation.service';
 import { PdfjsThumbnailSidebarComponent } from '../pdfjs-thumbnail-sidebar/pdfjs-thumbnail-sidebar.component';
+import { AnnotationType } from '../../../../models/enum';
+import { FileService } from '../../../../services/file.service';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-pdfjs-viewer',
@@ -21,6 +24,8 @@ import { PdfjsThumbnailSidebarComponent } from '../pdfjs-thumbnail-sidebar/pdfjs
   imports: [PdfjsThumbnailSidebarComponent],
 })
 export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
+  public AnnotationType = AnnotationType;
+
   @Input() documentId!: string;
   @Input() pageCount: number = 0;
 
@@ -33,6 +38,11 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
   private isDrawing = false;
   private startX = 0;
   private startY = 0;
+  private currentEndX = 0;
+  private currentEndY = 0;
+  private currentDrawingPage = 0;
+  private currentPoints: { x: number; y: number }[] = [];
+  public annotations: any[] = []; // List to store saved annotations
   private tempCanvas?: HTMLCanvasElement;
   private tempCtx?: CanvasRenderingContext2D | null;
 
@@ -45,13 +55,29 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
     private pdfjsService: PdfjsService,
     private annotationService: AnnotationService,
     private cdr: ChangeDetectorRef,
+    private fileService: FileService
   ) {}
 
   async ngAfterViewInit() {
     if (!this.documentId) return;
 
+    // Load the existing annotations before rendering the PDF pages
+    try {
+      const pagesMeta = await firstValueFrom(this.fileService.getPagesMetadata(this.documentId));
+      this.annotations = [];
+      pagesMeta.forEach((meta: any) => {
+        const pageAnns = meta.Annotations || meta.annotations;
+        if (pageAnns && Array.isArray(pageAnns)) {
+          this.annotations.push(...pageAnns);
+        }
+      });
+    } catch (e) {
+      console.error('Failed to load metadata', e);
+    }
+
     this.ngZone.runOutsideAngular(async () => {
-      const url = `http://localhost:4001/api/download/${this.documentId}`;
+      // Append a timestamp to the URL to bypass browser cache
+      const url = `http://localhost:4001/api/download/${this.documentId}?t=${new Date().getTime()}`;
 
       const pdf = await this.pdfjsService.loadDocument(url);
       this.pdfDoc = pdf;
@@ -100,14 +126,14 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
               this.currentVisiblePage = pageNum;
               this.cdr.markForCheck();
             });
-
-            this.loadAndRenderPage(pageNum, bestWrapper);
           }
 
-          // Cleanup pages that are not intersecting
+          // Load intersecting pages and cleanup non-intersecting pages
           entries.forEach((entry) => {
-            if (!entry.isIntersecting) {
-              const pn = Number(entry.target.getAttribute('data-page-number'));
+            const pn = Number(entry.target.getAttribute('data-page-number'));
+            if (entry.isIntersecting) {
+              this.loadAndRenderPage(pn, entry.target as HTMLElement);
+            } else {
               this.cleanupPage(pn, entry.target as HTMLElement);
             }
           });
@@ -169,6 +195,9 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
       overlay.addEventListener('mouseup', () => this.stopDrawing());
       overlay.addEventListener('mouseleave', () => this.stopDrawing());
 
+      // Draw existing annotations
+      this.drawExistingAnnotations(pageNum, overlay);
+
       wrapper.appendChild(overlay);
     } catch (err) {
       console.error(`Error rendering page ${pageNum}:`, err);
@@ -204,6 +233,11 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
     this.startX = event.clientX - rect.left;
     this.startY = event.clientY - rect.top;
 
+    this.currentEndX = this.startX;
+    this.currentEndY = this.startY;
+    this.currentDrawingPage = page;
+    this.currentPoints = [{ x: this.startX, y: this.startY }];
+
     // Create a temporary canvas for shapes
     this.tempCanvas = document.createElement('canvas');
     this.tempCanvas.width = overlay.width;
@@ -221,6 +255,9 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
+    this.currentEndX = x;
+    this.currentEndY = y;
+
     const ctx = this.tempCtx;
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
@@ -229,20 +266,21 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
 
     const tool = this.annotationService.currentTool;
 
-    if (tool === 'pen') {
+    if (tool === AnnotationType.Freehand) {
+      this.currentPoints.push({ x, y });
       ctx.lineTo(x, y);
       ctx.stroke();
     }
 
-    if (tool === 'rect') {
+    if (tool === AnnotationType.Rectangle) {
       ctx.strokeRect(this.startX, this.startY, x - this.startX, y - this.startY);
     }
 
-    if (tool === 'arrow') {
+    if (tool === AnnotationType.Arrow) {
       this.drawArrow(ctx, this.startX, this.startY, x, y);
     }
 
-    if (tool === 'highlight') {
+    if (tool === AnnotationType.Highlight) {
       ctx.globalAlpha = 0.3;
       ctx.fillStyle = 'yellow';
       ctx.fillRect(this.startX, this.startY, x - this.startX, y - this.startY);
@@ -254,6 +292,52 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
     if (!this.isDrawing) return;
     this.isDrawing = false;
 
+    const tool = this.annotationService.currentTool;
+    if (tool && this.currentDrawingPage > 0) {
+      const baseAnnotation = {
+        type: tool,
+        page: this.currentDrawingPage,
+        position: { x: this.startX, y: this.startY },
+      };
+
+      // Save the annotation properties based on the tool used
+      switch (tool) {
+        case AnnotationType.Rectangle:
+          this.annotations.push({
+            ...baseAnnotation,
+            width: this.currentEndX - this.startX,
+            height: this.currentEndY - this.startY,
+            color: this.annotationService.strokeColor,
+          });
+          break;
+        case AnnotationType.Highlight:
+          this.annotations.push({
+            ...baseAnnotation,
+            width: this.currentEndX - this.startX,
+            height: this.currentEndY - this.startY,
+            color: 'yellow',
+            opacity: 0.3,
+          });
+          break;
+        case AnnotationType.Freehand:
+          this.annotations.push({
+            ...baseAnnotation,
+            points: [...this.currentPoints],
+            color: this.annotationService.strokeColor,
+            strokeWidth: this.annotationService.strokeWidth,
+          });
+          break;
+        case AnnotationType.Arrow:
+          this.annotations.push({
+            ...baseAnnotation,
+            endPosition: { x: this.currentEndX, y: this.currentEndY },
+            color: this.annotationService.strokeColor,
+            strokeWidth: this.annotationService.strokeWidth,
+          });
+          break;
+      }
+    }
+
     if (this.tempCanvas) {
       const overlay = this.tempCanvas.previousSibling as HTMLCanvasElement;
       const overlayCtx = overlay.getContext('2d')!;
@@ -264,6 +348,45 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
 
     this.tempCanvas = undefined;
     this.tempCtx = null;
+  }
+
+  drawExistingAnnotations(pageNum: number, overlay: HTMLCanvasElement) {
+    const pageAnnotations = this.annotations.filter((a) => a.page === pageNum);
+    if (!pageAnnotations.length) return;
+
+    const ctx = overlay.getContext('2d');
+    if (!ctx) return;
+
+    pageAnnotations.forEach((ann: any) => {
+      ctx.strokeStyle = ann.color || '#ff0000';
+      ctx.lineWidth = ann.strokeWidth || 2;
+      ctx.fillStyle = ann.color || 'yellow';
+
+      if (ann.type === AnnotationType.Rectangle) {
+        ctx.strokeRect(ann.position.x, ann.position.y, ann.width, ann.height);
+      } else if (ann.type === AnnotationType.Highlight) {
+        ctx.globalAlpha = ann.opacity || 0.3;
+        ctx.fillRect(ann.position.x, ann.position.y, ann.width, ann.height);
+        ctx.globalAlpha = 1;
+      } else if (ann.type === AnnotationType.Freehand) {
+        if (ann.points && ann.points.length > 0) {
+          ctx.beginPath();
+          ctx.moveTo(ann.points[0].x, ann.points[0].y);
+          for (let i = 1; i < ann.points.length; i++) {
+            ctx.lineTo(ann.points[i].x, ann.points[i].y);
+          }
+          ctx.stroke();
+        }
+      } else if (ann.type === AnnotationType.Arrow) {
+        if (ann.endPosition) {
+          this.drawArrow(ctx, ann.position.x, ann.position.y, ann.endPosition.x, ann.endPosition.y);
+        }
+      }
+    });
+
+    // Todo: Need a better way to manage page annotations. If we add new annotations, and click Save, 
+    // the existing annotations will be duplicated at the backend since we are sending all annotations of the page to the server. 
+    // We should ideally only send new/updated annotations to the server, but that requires tracking which annotations are new/updated/deleted on the frontend.
   }
 
   drawArrow(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
@@ -314,7 +437,20 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
     scrollElement.scrollTop = targetTop;
   }
 
-  setTool(tool: any) {
+  setTool(tool: AnnotationType) {
     this.annotationService.setTool(tool);
+  }
+
+  save() {
+    if (!this.documentId) return;
+
+    this.fileService.saveAnnotations(this.documentId, this.annotations).subscribe({
+      next: (res) => {
+        console.log('Annotations saved successfully', res);
+      },
+      error: (err) => {
+        console.error('Error saving annotations', err);
+      }
+    });
   }
 }
