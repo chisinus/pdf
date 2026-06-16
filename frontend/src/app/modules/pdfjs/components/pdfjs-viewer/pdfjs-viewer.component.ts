@@ -31,6 +31,7 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
 
   @ViewChild('container', { static: true }) container!: ElementRef;
   @ViewChild('scrollContainer', { static: true }) scrollContainer!: ElementRef;
+  @ViewChild(PdfjsThumbnailSidebarComponent) thumbnailSidebar?: PdfjsThumbnailSidebarComponent;
 
   currentVisiblePage: number = 1;
   numPages: number = 0;
@@ -447,6 +448,9 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
     this.fileService.saveAnnotations(this.documentId, this.annotations).subscribe({
       next: (res) => {
         console.log('Annotations saved successfully', res);
+        if (this.thumbnailSidebar) {
+          this.thumbnailSidebar.downloadThumbnailsZip();
+        }
       },
       error: (err) => {
         console.error('Error saving annotations', err);

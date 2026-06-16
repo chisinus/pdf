@@ -193,7 +193,8 @@ public class PdfController : ControllerBase
             if (zipPath == null)
                 return NotFound("Thumbnail folder not found.");
 
-            string zipName = $"thumbnails_{start}_{end}.zip";
+            //string zipName = $"thumbnails_{start}_{end}.zip";
+            string zipName = $"thumbnails.zip";
             return PhysicalFile(zipPath, "application/zip", zipName);
         }
         catch (ArgumentException ex)

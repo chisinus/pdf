@@ -47,9 +47,8 @@ export class FileService {
   }
 
   async getThumbnailRangeZip(documentId: string, start: number, end: number): Promise<any[]> {
-    console.log('>>>>>>>>>>>>>xj fetching thumbnails zip for document', documentId, 'pages', start, 'to', end);
-    const url = `${this.api}/pdf/thumbnails/rangezip/${documentId}/${start}/${end}`;
-    console.log('>>>>>>>>>>>>>xj downloading thumbnails zip from', url);
+    // Append a timestamp to bust the browser cache when annotations are saved and thumbnails are updated
+    const url = `${this.api}/pdf/thumbnails/rangezip/${documentId}/${start}/${end}?t=${new Date().getTime()}`;
 
     // 1. Download ZIP as ArrayBuffer
     const response = await fetch(url);

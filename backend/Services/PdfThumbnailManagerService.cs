@@ -101,7 +101,8 @@ public class PdfThumbnailManagerService : IPdfThumbnailManagerService
         string cacheFolder = Path.Combine(Directory.GetCurrentDirectory(), "cache", id);
         Directory.CreateDirectory(cacheFolder);
 
-        string zipName = $"thumbnails_{start}_{end}.zip";
+        //string zipName = $"thumbnails_{start}_{end}.zip";
+        string zipName = $"thumbnails.zip";
         string zipPath = Path.Combine(cacheFolder, zipName);
 
         if (File.Exists(zipPath))

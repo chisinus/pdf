@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using PDFBackend.Models;
+using System.Drawing;
+using System.Drawing.Drawing2D;
 using PdfSharpCore.Drawing;
 using PdfSharpCore.Pdf.IO;
 
@@ -51,6 +53,19 @@ public class PdfAnnotationService : IPdfAnnotationService
 
         var updatedJson = JsonSerializer.Serialize(pageMetadataList, new JsonSerializerOptions { WriteIndented = true, IncludeFields = true });
         await File.WriteAllTextAsync(metadataPath, updatedJson);
+
+        try
+        {
+            var pdfFile = new DirectoryInfo(folderPath).GetFiles("*.pdf").FirstOrDefault(f => !IsTemporaryPdf(f));
+            if (pdfFile != null)
+            {
+                UpdateThumbnails(folderPath, pdfFile.FullName, pageMetadataList);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Failed to update thumbnails: {ex.Message}");
+        }
 
         return true;
     }
@@ -152,6 +167,105 @@ public class PdfAnnotationService : IPdfAnnotationService
         catch
         {
             return XColor.FromArgb((int)(opacity * 255), 255, 0, 0); // Fallback to red
+        }
+    }
+
+    private void UpdateThumbnails(string folderPath, string pdfPath, List<PageMetadata> pageMetadataList)
+    {
+        using var document = PdfReader.Open(pdfPath, PdfDocumentOpenMode.InformationOnly);
+
+        foreach (var meta in pageMetadataList)
+        {
+            var basePath = Path.Combine(folderPath, $"thumbnail.{meta.PageNumber}.base.jpg");
+            var thumbPath = Path.Combine(folderPath, $"thumbnail.{meta.PageNumber}.jpg");
+
+            // Backup original thumbnail on first edit
+            if (!File.Exists(basePath) && File.Exists(thumbPath))
+            {
+                File.Copy(thumbPath, basePath);
+            }
+
+            if (!File.Exists(basePath)) continue;
+
+            if (meta.Annotations == null || !meta.Annotations.Any())
+            {
+                // Restore original if no annotations exist
+                File.Copy(basePath, thumbPath, true);
+                continue;
+            }
+
+            // Draw annotations on the base thumbnail
+            using var baseImg = Image.FromFile(basePath);
+            using var bmp = new Bitmap(baseImg);
+            using var gfx = Graphics.FromImage(bmp);
+            
+            gfx.SmoothingMode = SmoothingMode.AntiAlias;
+
+            var page = document.Pages[meta.PageNumber - 1];
+            double pdfWidth = page.Width.Point;
+            double pdfHeight = page.Height.Point;
+            
+            // Frontend scales the PDF by 1.5x, matching scale in ApplyAnnotationsAsync
+            double frontendWidth = pdfWidth * 1.5;
+            double frontendHeight = pdfHeight * 1.5;
+            
+            double scaleX = bmp.Width / frontendWidth;
+            double scaleY = bmp.Height / frontendHeight;
+
+            foreach (var ann in meta.Annotations)
+            {
+                try 
+                {
+                    if (ann is AnnotationRectangle rect)
+                    {
+                        using var pen = new Pen(ParseDrawingColor(rect.Color), (float)(2 * scaleX));
+                        gfx.DrawRectangle(pen, (float)(rect.Position.X * scaleX), (float)(rect.Position.Y * scaleY), (float)(rect.Width * scaleX), (float)(rect.Height * scaleY));
+                    }
+                    else if (ann is AnnotationFreehand freehand && freehand.Points != null && freehand.Points.Count > 1)
+                    {
+                        using var pen = new Pen(ParseDrawingColor(freehand.Color), (float)(freehand.StrokeWidth * scaleX));
+                        var points = freehand.Points.Select(p => new PointF((float)(p.X * scaleX), (float)(p.Y * scaleY))).ToArray();
+                        gfx.DrawLines(pen, points);
+                    }
+                    else if (ann is AnnotationArrow arrow)
+                    {
+                        using var pen = new Pen(ParseDrawingColor(arrow.Color), (float)(arrow.StrokeWidth * scaleX));
+                        float x1 = (float)(arrow.Position.X * scaleX);
+                        float y1 = (float)(arrow.Position.Y * scaleY);
+                        float x2 = (float)(arrow.EndPosition.X * scaleX);
+                        float y2 = (float)(arrow.EndPosition.Y * scaleY);
+                        gfx.DrawLine(pen, x1, y1, x2, y2);
+
+                        float headLength = (float)(10 * scaleX);
+                        double dx = x2 - x1;
+                        double dy = y2 - y1;
+                        double angle = Math.Atan2(dy, dx);
+                        gfx.DrawLine(pen, x2, y2, x2 - (float)(headLength * Math.Cos(angle - Math.PI / 6)), y2 - (float)(headLength * Math.Sin(angle - Math.PI / 6)));
+                        gfx.DrawLine(pen, x2, y2, x2 - (float)(headLength * Math.Cos(angle + Math.PI / 6)), y2 - (float)(headLength * Math.Sin(angle + Math.PI / 6)));
+                    }
+                }
+                catch { /* Ignore invalid annotation drawing */ }
+            }
+
+            bmp.Save(thumbPath, System.Drawing.Imaging.ImageFormat.Jpeg);
+        }
+
+        // Invalidate zip cache if it exists, so next frontend request gets the updated thumbnails
+        var zipPath = Path.Combine(folderPath, "thumbnails.zip");
+        zipPath = zipPath.Replace("uploads", "cache"); // Assuming zip cache is stored in a parallel "cache" directory
+        if (File.Exists(zipPath)) File.Delete(zipPath);
+    }
+
+    private System.Drawing.Color ParseDrawingColor(string colorHex, double opacity = 1.0)
+    {
+        try
+        {
+            var c = System.Drawing.ColorTranslator.FromHtml(colorHex);
+            return System.Drawing.Color.FromArgb((int)(opacity * 255), c.R, c.G, c.B);
+        }
+        catch
+        {
+            return System.Drawing.Color.FromArgb((int)(opacity * 255), 255, 0, 0); // Fallback to red
         }
     }
 }
