@@ -1,0 +1,41 @@
+{
+    "page_number": 1,
+    "version": 1,
+    "width": 1.1,
+    "height": 1.1,
+    "orientation": "portrait",
+    "rotation": 0,
+    "annotations": [
+        {
+            "type": "annotation type",
+            "color": "#FFFF00",
+            "coordinates": [
+                {
+                    "x": 0.1,
+                    "y": 0.2,
+                    "width": 0.3,
+                    "height": 0.05
+                }
+            ],
+            "content": ""
+        }
+    ],
+    "extracted_text": [
+        {
+            "text": "Extracted text content",
+            "coordinates": {
+                "x": 0.1,
+                "y": 0.2,
+                "width": 0.3,
+                "height": 0.05
+            }
+        }
+    ],
+    "bookmarks": [
+        {
+            "title": "Bookmark Title",
+            "author": "",
+            "datetime": ""
+        }
+    ]
+}
