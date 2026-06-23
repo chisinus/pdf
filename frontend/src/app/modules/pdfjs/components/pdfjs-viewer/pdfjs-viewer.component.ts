@@ -50,6 +50,10 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
   private pdfDoc: any = null;
   private observer: IntersectionObserver | null = null;
   private renderedPages = new Set<number>();
+  private renderingPages = new Set<number>();
+  private renderTasks = new Map<number, any>();
+  private renderQueue: Array<{ pageNum: number; wrapper: HTMLElement }> = [];
+  private renderQueueRunning = false;
 
   constructor(
     private ngZone: NgZone,
@@ -104,6 +108,7 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
 
           let bestWrapper: HTMLElement | null = null;
           let bestArea = -1;
+          let bestPageNum = 0;
 
           wrappers.forEach((w) => {
             const r = w.getBoundingClientRect();
@@ -122,18 +127,22 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
           });
 
           if (bestWrapper && bestArea > 0) {
-            const pageNum = Number((bestWrapper as HTMLElement).getAttribute('data-page-number'));
+            bestPageNum = Number((bestWrapper as HTMLElement).getAttribute('data-page-number'));
             this.ngZone.run(() => {
-              this.currentVisiblePage = pageNum;
+              this.currentVisiblePage = bestPageNum;
               this.cdr.markForCheck();
             });
+
+            this.loadAndRenderPage(bestPageNum, bestWrapper, true);
           }
 
           // Load intersecting pages and cleanup non-intersecting pages
           entries.forEach((entry) => {
             const pn = Number(entry.target.getAttribute('data-page-number'));
             if (entry.isIntersecting) {
-              this.loadAndRenderPage(pn, entry.target as HTMLElement);
+              if (pn !== bestPageNum) {
+                this.loadAndRenderPage(pn, entry.target as HTMLElement);
+              }
             } else {
               this.cleanupPage(pn, entry.target as HTMLElement);
             }
@@ -154,7 +163,7 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
         wrapper.style.height = `${defaultHeight}px`;
         wrapper.style.position = 'relative';
         wrapper.style.margin = '0 auto 20px auto';
-        wrapper.style.backgroundColor = '#f3f4f6'; // Light gray placeholder
+        wrapper.style.backgroundColor = '#f3f4f6';
         wrapper.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
 
         this.container.nativeElement.appendChild(wrapper);
@@ -163,16 +172,72 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  async loadAndRenderPage(pageNum: number, wrapper: HTMLElement) {
-    if (this.renderedPages.has(pageNum)) return;
-    this.renderedPages.add(pageNum);
+  loadAndRenderPage(pageNum: number, wrapper: HTMLElement, priority = false) {
+    if (this.renderedPages.has(pageNum) || this.renderingPages.has(pageNum)) return;
+
+    const existingIndex = this.renderQueue.findIndex((item) => item.pageNum === pageNum);
+    if (existingIndex >= 0 ) {
+      const [existing] = this.renderQueue.splice(existingIndex, 1);
+      existing.wrapper = wrapper; // Update wrapper in case it changed
+      if (priority) {
+        this.renderQueue.unshift(existing);
+      } else {
+        this.renderQueue.push(existing);
+      }
+      return;
+    }
+
+    const queueItem = { pageNum, wrapper };
+    if (priority) {
+      this.renderQueue.unshift(queueItem);
+    } else {
+      this.renderQueue.push(queueItem);
+    }
+
+    this.processRenderQueue();
+  }
+
+  private async processRenderQueue() {
+    if (this.renderQueueRunning) return;
+    
+    this.renderQueueRunning = true;
+    
+    try {
+      while (this.renderQueue.length > 0) {
+        const next = this.renderQueue.shift()!;
+
+        if (this.renderedPages.has(next.pageNum) || this.renderingPages.has(next.pageNum)) {
+          continue;
+        }
+
+        if (!this.isWrapperNearViewport(next.wrapper)) {
+          continue;
+        }
+
+        await this.renderPage(next.pageNum, next.wrapper);
+      }
+    } finally {
+      this.renderQueueRunning = false;
+    }
+  }
+
+  private async renderPage(pageNum: number, wrapper: HTMLElement) {
+    this.renderingPages.add(pageNum);
 
     try {
       const page = await this.pdfDoc.getPage(pageNum);
+      if (!this.renderingPages.has(pageNum) || !this.isWrapperNearViewport(wrapper)) {
+        return;
+      }
+
       const viewport = page.getViewport({ scale: 1.5 });
 
       wrapper.style.width = `${viewport.width}px`;
       wrapper.style.height = `${viewport.height}px`;
+
+      while (wrapper.firstChild) {
+        wrapper.removeChild(wrapper.firstChild);
+      }
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d')!;
@@ -180,7 +245,14 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
       canvas.height = viewport.height;
       wrapper.appendChild(canvas);
 
-      await page.render({ canvasContext: ctx, viewport }).promise;
+      const renderTask = page.render({ canvasContext: ctx, viewport });
+      this.renderTasks.set(pageNum, renderTask);
+      await renderTask.promise;
+      this.renderTasks.delete(pageNum);
+
+      if (!this.renderingPages.has(pageNum)) {
+        return;
+      }
 
       // Add annotation overlay
       const overlay = document.createElement('canvas');
@@ -200,14 +272,29 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
       this.drawExistingAnnotations(pageNum, overlay);
 
       wrapper.appendChild(overlay);
+      this.renderedPages.add(pageNum);
     } catch (err) {
-      console.error(`Error rendering page ${pageNum}:`, err);
-      this.renderedPages.delete(pageNum);
+      if ((err as any)?.name === 'RenderingCancelledException') {
+        console.error(`Error rendering page ${pageNum}:`, err);
+      }
+    } finally {
+      this.renderTasks.delete(pageNum);
+      this.renderingPages.delete(pageNum);
     }
   }
 
   cleanupPage(pageNum: number, wrapper: HTMLElement) {
-    if (!this.renderedPages.has(pageNum)) return;
+    this.cancelQueuedRender(pageNum);
+
+    const renderTask = this.renderTasks.get(pageNum);
+    if (renderTask) {
+      renderTask.cancel();
+      this.renderTasks.delete(pageNum);
+    }
+
+    this.renderingPages.delete(pageNum);
+
+    if (!this.renderedPages.has(pageNum) && !wrapper.firstChild) return;
 
     // Destroy canvases to free browser memory
     while (wrapper.firstChild) {
@@ -220,6 +307,12 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
     if (this.observer) {
       this.observer.disconnect();
     }
+
+    this.renderQueue = [];
+    this.renderTasks.forEach((task) => task.cancel());
+    this.renderTasks.clear();
+    this.renderingPages.clear();
+
     if (this.pdfDoc) {
       this.pdfDoc.destroy();
     }
@@ -442,6 +535,22 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
     this.annotationService.setTool(tool);
   }
 
+  private cancelQueuedRender(pageNum: number) {
+    this.renderQueue = this.renderQueue.filter((item) => item.pageNum !== pageNum);
+  }
+
+  private isWrapperNearViewport(wrapper: HTMLElement): boolean {
+    const scrollEl = this.scrollContainer.nativeElement as HTMLElement;
+    const containerRect = scrollEl.getBoundingClientRect();
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const margin = 1000;
+
+    return (
+      wrapperRect.bottom >= containerRect.top - margin &&
+      wrapperRect.top <= containerRect.bottom + margin
+    );
+  }
+
   save() {
     if (!this.documentId) return;
 
@@ -449,7 +558,8 @@ export class PdfjsViewerComponent implements AfterViewInit, OnDestroy {
       next: (res) => {
         console.log('Annotations saved successfully', res);
         if (this.thumbnailSidebar) {
-          this.thumbnailSidebar.downloadThumbnailsZip();
+          // this.thumbnailSidebar.downloadThumbnailsZip();
+          this.thumbnailSidebar.refreshLoadedThumbnails();
         }
       },
       error: (err) => {

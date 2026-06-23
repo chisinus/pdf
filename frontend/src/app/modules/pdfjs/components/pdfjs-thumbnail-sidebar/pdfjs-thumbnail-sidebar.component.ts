@@ -37,8 +37,9 @@ export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
   ) {}
 
   ngOnInit() {
-    // this.loadBatch(1);
+    this.loadBatch(1);
     
+    // This slows down the initial load of both the thumbnails and the PDF itself, so it's commented out for now.
     this.downloadThumbnailsZip();
   }
 
@@ -56,6 +57,9 @@ export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
       } else {
         this.viewport.scrollToIndex(this.activePage - 1);
       }
+
+      const startPage = this.getBatchStart(this.activePage);
+      this.loadBatch(startPage);
     }
   }
 
@@ -75,11 +79,14 @@ export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
   requestedBatches = new Set<number>();
   batchSize = 20;
 
-  loadBatch(startPage: number) {
-    if (this.requestedBatches.has(startPage)) return;
+  loadBatch(startPage: number, force = false) {
+    if (this.pageCount <= 0) return;
+
+    if (!force && this.requestedBatches.has(startPage)) return;
+
     this.requestedBatches.add(startPage);
 
-    const endPage = startPage + this.batchSize - 1;
+    const endPage = Math.min(startPage + this.batchSize - 1, this.pageCount);
 
     this.fileService.getThumbnailRange(this.documentId, startPage, endPage).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((result) => {
       for (const item of result.thumbnails) {
@@ -93,8 +100,7 @@ export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
     const url = this.thumbnailUrls[page];
 
     if (!url) {
-      const startPage = Math.floor((page - 1) / this.batchSize) * this.batchSize + 1;
-      this.loadBatch(startPage);
+      this.loadBatch(this.getBatchStart(page));
     }
   }
 
@@ -103,5 +109,15 @@ export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
     for (const item of thumbnails) {
       this.thumbnailUrls[item.page] = item.url;
     }
+  }
+
+  refreshLoadedThumbnails() {
+    for (const startPage of this.requestedBatches) {
+      this.loadBatch(startPage, true);
+    }
+  }
+
+  getBatchStart(page: number): number {
+    return Math.floor((page - 1) / this.batchSize) * this.batchSize + 1;
   }
 }

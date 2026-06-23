@@ -15,6 +15,7 @@
     * If the PDF is not linearized, run QPDF to linearize it (crucial for partial byte-range fetching).
     * Extract lightweight document and page metadata (dimensions, count).
     * Begin generating thumbnails in background batches.
+    * Extract text
 
 ## Web APIs - Download (Byte-Range Fetching)
 

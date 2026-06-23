@@ -65,6 +65,7 @@ public class PdfController : ControllerBase
     }
 
     [HttpGet("download/{id}")]
+    [HttpHead("download/{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status206PartialContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
