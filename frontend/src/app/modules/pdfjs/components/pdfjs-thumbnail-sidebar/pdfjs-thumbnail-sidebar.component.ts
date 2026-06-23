@@ -79,7 +79,7 @@ export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
   requestedBatches = new Set<number>();
   batchSize = 20;
 
-  loadBatch(startPage: number, force = false) {
+  private loadBatch(startPage: number, force = false) {
     if (this.pageCount <= 0) return;
 
     if (!force && this.requestedBatches.has(startPage)) return;
@@ -117,7 +117,7 @@ export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
     }
   }
 
-  getBatchStart(page: number): number {
+  private getBatchStart(page: number): number {
     return Math.floor((page - 1) / this.batchSize) * this.batchSize + 1;
   }
 }
