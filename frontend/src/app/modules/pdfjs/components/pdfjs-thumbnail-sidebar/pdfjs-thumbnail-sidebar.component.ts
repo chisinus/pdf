@@ -40,7 +40,7 @@ export class PdfjsThumbnailSidebarComponent implements OnInit, OnChanges {
     this.loadBatch(1);
     
     // This slows down the initial load of both the thumbnails and the PDF itself, so it's commented out for now.
-    this.downloadThumbnailsZip();
+    // this.downloadThumbnailsZip();
   }
 
   ngOnChanges(changes: SimpleChanges) {
