@@ -3,8 +3,8 @@
     public class PageMetadata
     {
         public int PageNumber;
-        public int Width;
-        public int Height;
+        public double Width;
+        public double Height;
         public int Rotation;
         public AnnotationBase[]? Annotations;
     }

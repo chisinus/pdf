@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-const PDFJS_WASM_URL = 'https://unpkg.com/pdfjs-dist@5.7.284/WASM/';
+// const PDFJS_WASM_URL = 'https://unpkg.com/pdfjs-dist@5.7.284/WASM/';
+const PDFJS_WASM_URL = '/assets/pdfjs-wasm/';
 const PDFJS_WORKER_SRC = '/assets/pdf.worker.min.mjs';
 
 const NativePromise = (async () => {})().constructor as PromiseConstructor;
@@ -64,7 +65,7 @@ export class PdfjsService {
     return pdfjsLib.getDocument({
       url,
       wasmUrl: PDFJS_WASM_URL, // Real wasm only
-      disableStream: true,
+      disableStream: false,
       disableRange: true,
     }).promise;
   }
